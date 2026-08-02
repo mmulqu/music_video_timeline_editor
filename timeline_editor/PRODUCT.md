@@ -35,8 +35,9 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
   chronological cue sheet, where they can be sought, retimed, replaced, or
   removed without inventing a caption association.
 - Add, retime, and associate still-image, animated-GIF, or video visual cues.
-- Replace the visual under the playhead without changing its timeline In/Out;
-  adding another beat is a separate explicit mode.
+- Replace the visual under the playhead without changing its timeline In/Out.
+  Adding another visual is a separate explicit mode that evenly divides the
+  cue's existing visual coverage without changing its outer or caption timing.
 - Load a local music file, fingerprint it, and preview the synchronized edit.
 - Slow preview playback to a preset or custom rate for manual timing while
   preserving the soundtrack file and timeline timecodes unchanged.

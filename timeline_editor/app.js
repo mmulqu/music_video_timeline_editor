@@ -327,7 +327,7 @@ function openLibraryForReplacement() {
 
 function openLibraryForNewBeat() {
   if (!currentCaption()) {
-    setStatus("Select a lyric row before adding a new visual beat. Visual-only rows can be replaced directly.", true);
+    setStatus("Select a lyric row before adding another visual. Visual-only rows can be replaced directly.", true);
     return;
   }
   state.libraryMode = "add";
@@ -345,12 +345,16 @@ function renderCueMediaManager() {
   byId("cue-media-count").textContent = visualOnly ? "visual-only beat" : `${visuals.length} visual${visuals.length === 1 ? "" : "s"}`;
   byId("cue-media-help").textContent = visualOnly
     ? "This image has its own timeline interval and no lyric. Replace or retime it without moving any caption."
-    : "Replace an existing shot, seek to it, or open Library to add another visual beat to this lyric.";
-  byId("add-from-library").textContent = visualOnly ? "Replace this visual from Library" : "+ Add visual from Library";
+    : visuals.length
+      ? "Adding another visual divides this cue's current visual coverage evenly. Lyric and soundtrack timing stay fixed."
+      : "This lyric has no visual yet. Add one without changing its timing.";
+  byId("add-from-library").textContent = visualOnly
+    ? "Replace this visual from Library"
+    : visuals.length ? "+ Split cue with another visual" : "+ Add first visual from Library";
   const list = byId("cue-media-list");
   list.replaceChildren();
   if (!visuals.length) {
-    list.innerHTML = '<p class="empty-note">This lyric has no visual attached. Use “Add visual from Library.”</p>';
+    list.innerHTML = '<p class="empty-note">This lyric has no visual attached. Add its first visual from Library.</p>';
     return;
   }
   for (const visual of visuals) {
@@ -475,6 +479,7 @@ function renderAssets() {
   grid.replaceChildren();
   const replacing = state.libraryMode === "replace";
   const cue = currentCaption();
+  const cueVisualCount = cue ? visualsForCaption(cue.id).length : 0;
   const target = replacing ? state.manifest.visuals.find((visual) => visual.id === state.replacingVisualId) : null;
   const targetAsset = target ? assetById(target.asset_id) : null;
   const modePanel = byId("replace-mode");
@@ -485,11 +490,13 @@ function renderAssets() {
   } else if (replacing) {
     byId("library-mode-label").textContent = "No visual under the playhead. Seek to a visual before replacing it.";
   } else if (!cue) {
-    byId("library-mode-label").textContent = "Select a lyric row before adding a new visual beat.";
+    byId("library-mode-label").textContent = "Select a lyric row before adding another visual.";
   } else {
-    byId("library-mode-label").textContent = `Adding a new visual beat to ${cue.id}`;
+    byId("library-mode-label").textContent = cueVisualCount
+      ? `Splitting ${cue.id} into ${cueVisualCount + 1} equal visual beats • lyric timing stays fixed`
+      : `Adding the first visual to ${cue.id} • lyric timing stays fixed`;
   }
-  byId("toggle-library-mode").textContent = replacing ? "+ Add new beat" : "Replace current instead";
+  byId("toggle-library-mode").textContent = replacing ? "+ Split cue" : "Replace current instead";
   const assets = state.manifest.assets.filter((asset) => !filter || `${asset.name} ${asset.relative_path}`.toLowerCase().includes(filter));
   for (const asset of assets) {
     const card = byId("asset-template").content.firstElementChild.cloneNode(true);
@@ -513,7 +520,9 @@ function renderAssets() {
     card.querySelector("strong").textContent = asset.name;
     card.querySelector("span").textContent = `${assetTypeLabel(asset)} • ${asset.relative_path || "session only"}`;
     const useButton = card.querySelector(".use-asset");
-    useButton.textContent = replacing ? (target ? `Replace ${target.id}` : "Seek to a visual first") : cue ? `Add new beat to ${cue.id}` : "Select a lyric row first";
+    useButton.textContent = replacing
+      ? (target ? `Replace ${target.id}` : "Seek to a visual first")
+      : cue ? (cueVisualCount ? `Split ${cue.id} with this visual` : `Add first visual to ${cue.id}`) : "Select a lyric row first";
     useButton.disabled = replacing ? !target : !cue;
     if (!useButton.disabled) useButton.addEventListener("click", () => useAssetForCue(asset.id));
     grid.append(card);
@@ -553,12 +562,31 @@ function nextVisualId() {
 function addVisualAtCue(assetId) {
   const cue = currentCaption();
   if (!cue) return;
-  const overlaps = state.manifest.visuals.filter((visual) => visual.start < cue.end && visual.end > cue.start).length;
-  state.manifest.visuals.push({ id: nextVisualId(), caption_id: cue.id, asset_id: assetId, start: cue.start, end: cue.end, source_in: 0, source_out: null, motion: "static", transition: "hard", notes: "Added in Timeline Desk." });
-  dirty(overlaps
-    ? `Added new beat to ${cue.id} • overlaps ${overlaps} existing beat${overlaps === 1 ? "" : "s"}; review In/Out`
-    : `Added new beat to ${cue.id}`);
-  renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable();
+  const existing = visualsForCaption(cue.id).sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+  const coverageStart = existing.length ? Math.min(...existing.map((visual) => visual.start)) : cue.start;
+  const coverageEnd = existing.length ? Math.max(...existing.map((visual) => visual.end)) : cue.end;
+  const visualCount = existing.length + 1;
+  const interval = (coverageEnd - coverageStart) / visualCount;
+  if (interval < MIN_INTERVAL_SECONDS) {
+    setStatus(`${cue.id} is too short to divide into ${visualCount} valid visual beats.`, true);
+    return;
+  }
+
+  const added = { id: nextVisualId(), caption_id: cue.id, asset_id: assetId, start: coverageStart, end: coverageEnd, source_in: 0, source_out: null, motion: "static", transition: "hard", notes: "Added by evenly dividing the cue's existing visual coverage in Timeline Desk." };
+  const sequence = [...existing, added];
+  for (let index = 0; index < sequence.length; index++) {
+    sequence[index].start = Number((coverageStart + interval * index).toFixed(6));
+    sequence[index].end = index === sequence.length - 1
+      ? Number(coverageEnd.toFixed(6))
+      : Number((coverageStart + interval * (index + 1)).toFixed(6));
+  }
+  state.manifest.visuals.push(added);
+  sortTimeline();
+  state.currentVisualId = null;
+  dirty(existing.length
+    ? `Added visual to ${cue.id} • ${visualCount} equal beats across ${clock(coverageStart)}–${clock(coverageEnd)} • lyric timing unchanged`
+    : `Added first visual to ${cue.id} • lyric timing unchanged`);
+  renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable(); updateProgramMonitor(song.currentTime, activeCaptionAt(song.currentTime), true);
 }
 
 function updateVisualTiming(id, field, value) {

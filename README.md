@@ -12,8 +12,9 @@ the song.
 
 Opening **Library** defaults to replacing the visual under the playhead. The
 editor names the targeted visual and preserves its exact timeline In/Out. Adding
-another visual beat requires the separate **+ Add new beat** mode and reports
-overlaps.
+another image requires the separate **+ Split cue** mode. It keeps the current
+visual group's outer In/Out and divides that coverage evenly across the images,
+without moving lyric or soundtrack timing.
 
 The cue sheet interleaves lyrics with uncaptioned `VIS` rows, so every image
 interval can be found and edited. Preview playback can be slowed without

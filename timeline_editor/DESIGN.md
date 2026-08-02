@@ -55,8 +55,10 @@ another beat cannot be mistaken for replacement.
 
 Opening Library defaults to replacing the visual under the playhead and names
 that target with its visual ID and preserved timeline range. If no visual is
-active, disable asset selection instead of silently adding one. Creating another
-beat requires an explicit Add-new mode and reports any resulting overlaps.
+active, disable asset selection instead of silently adding one. Adding another
+visual requires an explicit Split-cue mode: preserve the current visual group's
+outer In/Out, divide that coverage evenly across the ordered visuals, and leave
+caption and soundtrack timing unchanged.
 
 Keep the Library current without moving the playhead: scan the project `images`
 folder when Library opens, every 15 seconds while it remains visible, and through
