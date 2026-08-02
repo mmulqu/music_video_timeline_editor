@@ -1,0 +1,30 @@
+{
+  "schema": "music-video-timeline/v1",
+  "project_id": "untitled-music-video",
+  "title": "Untitled music video timeline",
+  "soundtrack": {
+    "relative_path": "",
+    "source_name": "",
+    "duration_seconds": 1,
+    "sha256": "",
+    "locked": true,
+    "audio_policy": "stream-copy-only"
+  },
+  "captions": [
+    {
+      "id": "C001",
+      "section": "Setup",
+      "text": "Load a song, then edit or replace this caption.",
+      "start": 0,
+      "end": 1,
+      "confidence": 1,
+      "notes": "Starter cue; saved timeline JSON includes this field."
+    }
+  ],
+  "visuals": [],
+  "assets": [],
+  "editor": {
+    "caption_source": "starter manifest"
+  }
+}
+

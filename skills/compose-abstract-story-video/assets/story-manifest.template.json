@@ -1,0 +1,66 @@
+{
+  "project_id": "abstract-story-001",
+  "title": "Untitled Abstract Story",
+  "duration_target": 165,
+  "resolution": [1920, 1080],
+  "fps": 24,
+  "image_backend": "unselected",
+  "music_backend": "musicgen-small",
+  "audio_crossfade_seconds": 3,
+  "acts": [
+    {
+      "id": "act-01",
+      "title": "Latency",
+      "story_function": "",
+      "visual_state": "",
+      "music_state": ""
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-01",
+      "act_id": "act-01",
+      "duration": 12,
+      "source_type": "generated",
+      "prompt": "",
+      "negative_prompt": "",
+      "seed": 1,
+      "width": 1344,
+      "height": 768,
+      "motion": {
+        "type": "push",
+        "amount": 0.03
+      },
+      "transition": {
+        "type": "crossfade",
+        "duration": 1
+      },
+      "asset_path": "storyboard/shot-01.png",
+      "generation_status": "pending",
+      "approval_status": "unreviewed"
+    }
+  ],
+  "music_movements": [
+    {
+      "id": "music-01",
+      "act_id": "act-01",
+      "duration": 30,
+      "prompt": "instrumental ambient music, no vocals, no spoken word, no choir",
+      "seed": 1,
+      "guidance_scale": 3,
+      "temperature": 1,
+      "asset_path": "music/music-01.wav",
+      "generation_status": "pending",
+      "approval_status": "unreviewed"
+    }
+  ],
+  "render": {
+    "proxy_resolution": [960, 540],
+    "proxy_codec": "h264_nvenc",
+    "final_codec": "libx264",
+    "final_pixel_format": "yuv420p",
+    "audio_codec": "aac",
+    "audio_loudness_lufs": -14,
+    "resolved_duration": null
+  }
+}

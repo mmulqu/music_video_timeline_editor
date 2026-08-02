@@ -1,0 +1,23 @@
+# Local media and editing state
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.ogg
+*.mp4
+*.mov
+*.mkv
+*.webm
+*-timeline.json
+timeline_editor/chrome-qa-profile/
+
+# Project media is intentionally local by default
+images/*
+!images/.gitkeep
+
+# Python and OS artifacts
+**/__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+

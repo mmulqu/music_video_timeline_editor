@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compose Abstract Story Video"
+  short_description: "Edit supplied or generated abstract story films"
+  default_prompt: "Use $compose-abstract-story-video to turn this theme or image sequence into a reviewable abstract visual narrative with instrumental music."

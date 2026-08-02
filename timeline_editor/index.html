@@ -1,0 +1,193 @@
+<!doctype html>
+<!--
+THESIS: A local lyric-and-picture timing desk, not a generic media manager.
+OWN-WORLD: Ink-blue projection room, parchment text, poppy-orange playhead,
+mineral panels, and an oversized waveform as the working object.
+STORY: Play the immutable song, correct canonical caption timing, and connect
+visual beats to it without touching the audio.
+FIRST VIEWPORT: Transport and waveform dominate the center; the selected line
+is editable at left and its visual evidence lives at right.
+FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Music Video Timeline Desk</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">LOCAL MUSIC VIDEO EDITOR</p>
+        <h1>MUSIC VIDEO TIMELINE <span>Timeline Desk</span></h1>
+      </div>
+      <div class="topbar-actions">
+        <div class="lock-badge" title="The song is never trimmed, processed, or re-encoded by this editor.">
+          <span aria-hidden="true">◆</span> SOUNDTRACK LOCKED
+        </div>
+        <button id="load-music" class="secondary">Load music</button>
+        <button id="open-manifest" class="secondary">Open timeline</button>
+        <button id="save-manifest" class="primary">Save timeline JSON</button>
+        <input id="music-input" type="file" accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg" hidden />
+        <input id="manifest-input" type="file" accept="application/json,.json" hidden />
+      </div>
+    </header>
+
+    <main class="editor-shell">
+      <aside class="inspector" aria-label="Selected caption editor">
+        <div class="panel-heading">
+          <p class="eyebrow">SELECTED CAPTION</p>
+          <strong id="selected-id">—</strong>
+        </div>
+        <p id="selected-section" class="section-label">Choose a line from the cue sheet.</p>
+
+        <label class="field-label" for="caption-text">Caption text <span>canonical copy</span></label>
+        <textarea id="caption-text" rows="5" spellcheck="true" placeholder="Caption text"></textarea>
+
+        <div class="time-grid">
+          <label class="field-label" for="caption-start">In
+            <input id="caption-start" inputmode="decimal" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field-label" for="caption-end">Out
+            <input id="caption-end" inputmode="decimal" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+        <p id="selected-duration" class="duration-readout">—</p>
+
+        <div class="boundary-actions">
+          <button id="set-in" class="secondary" title="Make this caption appear at the current song position">[ Set In</button>
+          <button id="set-out" class="secondary" title="Make this caption disappear at the current song position">Set Out ]</button>
+        </div>
+        <p class="timing-help">In = caption appears. Out = caption disappears. The song is never changed.</p>
+        <div class="jump-actions">
+          <button id="jump-in" class="quiet">Jump to In</button>
+          <button id="jump-out" class="quiet">Jump to Out</button>
+        </div>
+
+        <label class="field-label" for="caption-notes">Notes <span>saved in output JSON</span></label>
+        <textarea id="caption-notes" rows="3" placeholder="Timing or visual note…"></textarea>
+
+        <section class="linked-visuals" aria-label="Visual beats tied to selected caption">
+          <div class="subheading"><span>VISUAL BEATS</span><span>EDITABLE</span></div>
+          <div id="linked-visual-list" class="linked-visual-list"><p class="empty-note">No visual beat attached yet.</p></div>
+        </section>
+
+        <div class="shortcuts">
+          <p><kbd>Space</kbd> play/pause</p>
+          <p><kbd>←</kbd><kbd>→</kbd> nudge 0.1s</p>
+          <p><kbd>[</kbd> / <kbd>]</kbd> set In / Out</p>
+        </div>
+      </aside>
+
+      <section class="workspace" aria-label="Song timeline and caption cue sheet">
+        <section class="transport-panel">
+          <div class="transport-topline">
+            <div class="transport-controls">
+              <button id="rewind" class="icon-button" title="Back 5 seconds" aria-label="Back 5 seconds">↶</button>
+              <button id="play-toggle" class="play-button" aria-label="Play">▶</button>
+              <button id="forward" class="icon-button" title="Forward 5 seconds" aria-label="Forward 5 seconds">↷</button>
+            </div>
+            <div class="clock"><output id="current-clock">00:00.000</output><span>/</span><output id="total-clock">00:00.000</output></div>
+            <div class="transport-meta"><span id="caption-at-playhead">No caption at playhead</span></div>
+          </div>
+          <div class="transport-stage">
+            <div class="program-monitor" aria-label="Current visual preview">
+              <img id="program-image" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Current visual preview" hidden />
+              <video id="program-video" muted playsinline preload="metadata" hidden></video>
+              <div id="program-caption" class="program-caption" hidden></div>
+              <div class="program-readout">
+                <span>PROGRAM</span>
+                <output id="current-visual-label">—</output>
+                <button id="replace-program-visual" class="program-replace" type="button" title="Replace the visual currently under the playhead" hidden>Replace visual</button>
+              </div>
+            </div>
+            <div class="timeline-column">
+              <div class="waveform-wrap">
+                <canvas id="waveform" aria-label="Song waveform. Click to seek."></canvas>
+                <div id="playhead" class="playhead" aria-hidden="true"></div>
+                <div id="cue-window" class="cue-window" aria-hidden="true"></div>
+              </div>
+              <div class="follow-control">
+                <label><input id="follow-playhead" type="checkbox" checked /> Follow active caption</label>
+                <span id="music-file-label">No song loaded</span>
+              </div>
+            </div>
+          </div>
+          <div class="transport-bottomline">
+            <span>Click waveform to seek</span>
+            <span id="save-status" role="status">Load a song or open a timeline to begin</span>
+            <span>Audio policy: <b>stream copy only</b></span>
+          </div>
+          <audio id="song" preload="metadata"></audio>
+        </section>
+
+        <section class="cue-sheet-panel">
+          <div class="sheet-heading">
+            <div>
+              <p class="eyebrow">CAPTION CUE SHEET</p>
+              <h2>Lyrics are truth. Timing is editable.</h2>
+            </div>
+            <div class="sheet-tools">
+              <label class="search"><span>⌕</span><input id="caption-filter" type="search" placeholder="Find text, ID, or section" /></label>
+              <button id="add-caption" class="secondary">+ Caption</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="caption-table">
+              <thead><tr><th>ID</th><th>IN</th><th>OUT</th><th>LINE</th><th>VISUAL</th><th></th></tr></thead>
+              <tbody id="caption-list"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <aside class="asset-bin" aria-label="Media asset bin">
+        <div class="panel-heading asset-heading">
+          <div><p class="eyebrow">VISUAL MEDIA</p><strong id="asset-count">0 assets</strong></div>
+          <div class="asset-imports">
+            <button id="import-files" class="secondary" title="Import still images, animated GIFs, or videos">+ files</button>
+            <button id="import-folder" class="secondary" title="Import project-relative still images, animated GIFs, and videos">+ project folder</button>
+            <input id="asset-files-input" type="file" accept="image/*,image/gif,.gif,video/*" multiple hidden />
+            <input id="asset-folder-input" type="file" accept="image/*,image/gif,.gif,video/*" multiple webkitdirectory hidden />
+          </div>
+        </div>
+        <div class="media-tabs" role="tablist" aria-label="Visual media views">
+          <button id="cue-media-tab" class="media-tab active" role="tab" aria-selected="true">Current cue</button>
+          <button id="library-media-tab" class="media-tab" role="tab" aria-selected="false">Library</button>
+        </div>
+        <section id="cue-media-panel" class="media-tab-panel" role="tabpanel">
+          <div class="cue-media-summary"><strong id="cue-media-title">C001</strong><span id="cue-media-count">0 visuals</span></div>
+          <p class="asset-help">Replace an existing shot, seek to it, or open Library to add another visual beat to this lyric.</p>
+          <button id="add-from-library" class="primary media-wide-action">+ Add visual from Library</button>
+          <div id="cue-media-list" class="cue-media-list"></div>
+        </section>
+        <section id="library-media-panel" class="media-tab-panel library-panel" role="tabpanel" hidden>
+          <div id="replace-mode" class="replace-mode">
+            <span id="library-mode-label">Replacing the visual under the playhead</span>
+            <div class="replace-mode-actions">
+              <button id="toggle-library-mode" class="text-button" type="button">+ Add new beat</button>
+              <button id="cancel-replace" class="text-button" type="button">Back</button>
+            </div>
+          </div>
+          <p class="asset-help">Stills, animated GIFs, and videos are supported. Choose the <b>repository project folder</b> for reusable saved paths. Individual files remain session-only until they have a project-relative path.</p>
+          <div class="library-toolbar">
+            <label class="search assets-search"><span>⌕</span><input id="asset-filter" type="search" placeholder="Filter assets" /></label>
+            <button id="refresh-assets" class="secondary refresh-assets" type="button" title="Scan the project images folder now">↻ Refresh</button>
+          </div>
+          <p id="asset-refresh-status" class="asset-refresh-status" role="status">Watching images • refreshes every 15 seconds while Library is open</p>
+          <div id="asset-grid" class="asset-grid"></div>
+        </section>
+      </aside>
+    </main>
+
+    <template id="asset-template">
+      <article class="asset-card">
+        <div class="asset-thumb"></div>
+        <div class="asset-info"><strong></strong><span></span></div>
+        <button class="use-asset">Use at selected cue</button>
+      </article>
+    </template>
+    <script src="app.js"></script>
+  </body>
+</html>
