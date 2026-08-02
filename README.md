@@ -15,6 +15,12 @@ editor names the targeted visual and preserves its exact timeline In/Out. Adding
 another visual beat requires the separate **+ Add new beat** mode and reports
 overlaps.
 
+The cue sheet interleaves lyrics with uncaptioned `VIS` rows, so every image
+interval can be found and edited. Preview playback can be slowed without
+changing saved timecodes or the soundtrack. **Ripple boundaries** is enabled by
+default: image cuts stay continuous, nearby lyric edges move together, and
+longer intentional lyric pauses remain intact.
+
 ## Run locally
 
 Requirements: Python 3.10+ and a current Chromium-based browser. FFmpeg and
@@ -37,9 +43,12 @@ Then open <http://127.0.0.1:8878/timeline_editor/>.
 1. Use **Load music** and choose the finished song. Keep that file in the
    repository root when assembling later.
 2. Edit caption copy and In/Out at the playhead, or open an existing timeline.
+   Use the speed presets or custom field for close timing work. Disable
+   **Ripple boundaries** only when you intentionally want a gap or overlap.
 3. Put reusable visual files in `images/`. Library scans that directory when it
    opens, every 15 seconds while visible, and whenever **Refresh** is pressed.
-4. Seek to a visual and choose a Library asset to replace it without retiming.
+4. Seek to a caption or blank-lyric `VIS` row and choose a Library asset to
+   replace it without retiming.
 5. Save the timeline JSON.
 
 The browser can also import individual files or a complete project folder.

@@ -16,9 +16,22 @@ timecodes and compact all-caps labels only for a few persistent controls.
 ## Interaction
 
 The playhead is the central instrument. Clicking the waveform seeks. The
-selected cue follows playback. Keyboard shortcuts and explicit Set In/Set Out
+selected timeline row follows playback. Caption rows and visual-only rows share
+one chronological cue sheet; visual-only rows show a blank lyric cell and their
+own image In/Out so no media interval is hidden between lyrics. Keyboard
+shortcuts and explicit Set In/Set Out
 buttons perform the same timing action. Asset assignment is visible in the cue
 row and reflected in a separate visual-beat list.
+
+Preview-speed controls offer normal, 0.8×, 0.5×, 0.3×, and a custom rate. They
+change browser playback only, preserve pitch where supported, and never alter
+the soundtrack asset or saved timeline coordinates.
+
+In/Out edits use boundary ripple by default. Moving a row's In hands the same
+cut point to the previous visual; moving its Out hands the cut point to the next
+visual. Nearby lyric boundaries move with their neighboring caption, but longer
+lyric pauses remain intact. Keep a visible opt-out beside the time fields for
+intentional black gaps, holds, or overlaps.
 
 The program monitor sits beside the waveform and displays the still image,
 looping animated GIF, or muted video active at the song playhead, with the

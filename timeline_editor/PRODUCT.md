@@ -31,10 +31,19 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
 ## Capabilities and Constraints
 
 - Edit caption text, start, and end times.
+- Show uncaptioned visual intervals as first-class, blank-lyric rows in the
+  chronological cue sheet, where they can be sought, retimed, replaced, or
+  removed without inventing a caption association.
 - Add, retime, and associate still-image, animated-GIF, or video visual cues.
 - Replace the visual under the playhead without changing its timeline In/Out;
   adding another beat is a separate explicit mode.
 - Load a local music file, fingerprint it, and preview the synchronized edit.
+- Slow preview playback to a preset or custom rate for manual timing while
+  preserving the soundtrack file and timeline timecodes unchanged.
+- Ripple edited In/Out boundaries across adjacent visual beats by default so
+  retiming cannot silently create black frames. Couple nearby lyric boundaries
+  while preserving longer intentional lyric pauses and visual-only passages;
+  allow ripple to be disabled for deliberate gaps or overlaps.
 - Follow and scroll to the active caption during playback.
 - Import project folders or individual local media files as session assets.
 - Discover newly added files from the project `images` folder on demand and
