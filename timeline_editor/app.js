@@ -7,7 +7,7 @@ const VIDEO_RE = /\.(mp4|mov|m4v|mkv|webm)$/i;
 const GIF_RE = /\.gif$/i;
 const MIN_INTERVAL_SECONDS = .01;
 const CAPTION_RIPPLE_TOLERANCE_SECONDS = .15;
-const state = { manifest: null, selectedCaptionId: null, selectedVisualOnlyId: null, currentVisualId: null, replacingVisualId: null, libraryMode: "replace", mediaTab: "cue", saveHandle: null, objectUrls: new Map(), waveform: null, playbackFrame: null, musicObjectUrl: null, pendingSeek: null, gifRestart: 0, assetRefreshTimer: null, assetRefreshInFlight: false };
+const state = { manifest: null, selectedCaptionId: null, selectedVisualOnlyId: null, currentVisualId: null, replacingVisualId: null, libraryMode: "replace", mediaTab: "cue", clockDisplayMode: "timecode", timelineFileName: "seed-manifest.json", saveHandle: null, objectUrls: new Map(), waveform: null, playbackFrame: null, musicObjectUrl: null, pendingSeek: null, gifRestart: 0, assetRefreshTimer: null, assetRefreshInFlight: false, lightboxAssetId: null, lightboxReturnFocus: null };
 const song = byId("song");
 const waveform = byId("waveform");
 const waveformContext = waveform.getContext("2d");
@@ -20,6 +20,46 @@ function clock(seconds, precision = 3) {
   const secs = Math.floor(total % 60);
   const ms = Math.round((total - Math.floor(total)) * 1000);
   return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${String(ms).padStart(3, "0").slice(0, precision)}`;
+}
+
+function secondsClock(seconds, precision = 3) {
+  return Math.max(0, Number(seconds) || 0).toFixed(precision);
+}
+
+function transportClock(seconds) {
+  return state.clockDisplayMode === "seconds" ? secondsClock(seconds) : clock(seconds);
+}
+
+function setClockDisplayMode(mode, announce = true) {
+  state.clockDisplayMode = mode === "seconds" ? "seconds" : "timecode";
+  for (const button of document.querySelectorAll(".clock-format-option")) {
+    const active = button.dataset.clockFormat === state.clockDisplayMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  byId("current-clock").value = transportClock(song.currentTime);
+  byId("total-clock").value = transportClock(state.manifest ? duration() : 0);
+  if (announce) setStatus(state.clockDisplayMode === "seconds"
+    ? "Waveform clock: total seconds • copy this value directly into In/Out"
+    : "Waveform clock: minutes and seconds • switch to Seconds for direct In/Out entry");
+}
+
+function restoreClockDisplayPreference() {
+  try {
+    setClockDisplayMode(localStorage.getItem("timeline-desk-clock-display") || "timecode", false);
+  } catch (error) {
+    console.warn("Could not restore waveform clock preference", error);
+    setClockDisplayMode("timecode", false);
+  }
+}
+
+function setTimelineFileName(filename) {
+  const name = String(filename || "Unnamed timeline");
+  state.timelineFileName = name;
+  const output = byId("timeline-file-name");
+  output.textContent = name;
+  output.title = `Current timeline file: ${name}`;
+  document.title = `${name} — Timeline Desk`;
 }
 
 function num(value, fallback = 0) {
@@ -369,6 +409,66 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character]));
 }
 
+function releaseAssetLightbox() {
+  const stage = byId("media-lightbox-stage");
+  stage.querySelector("video")?.pause();
+  stage.replaceChildren();
+  const assetId = state.lightboxAssetId;
+  state.lightboxAssetId = null;
+  const returnFocus = state.lightboxReturnFocus;
+  state.lightboxReturnFocus = null;
+  const focusTarget = returnFocus?.isConnected
+    ? returnFocus
+    : [...document.querySelectorAll(".asset-thumb")].find((button) => button.dataset.assetId === assetId);
+  if (focusTarget) requestAnimationFrame(() => focusTarget.focus());
+}
+
+function closeAssetLightbox() {
+  const dialog = byId("media-lightbox");
+  if (typeof dialog.close === "function" && dialog.open) dialog.close();
+  else {
+    dialog.removeAttribute("open");
+    releaseAssetLightbox();
+  }
+}
+
+function openAssetLightbox(assetId, trigger) {
+  const asset = assetById(assetId);
+  if (!asset) {
+    setStatus("That library asset is no longer available. Refresh the Library and try again.", true);
+    return;
+  }
+
+  const dialog = byId("media-lightbox");
+  const stage = byId("media-lightbox-stage");
+  const preview = asset.type === "video" ? document.createElement("video") : document.createElement("img");
+  if (asset.type === "video") {
+    preview.controls = true;
+    preview.muted = true;
+    preview.preload = "metadata";
+    preview.playsInline = true;
+    preview.setAttribute("aria-label", asset.name);
+  } else {
+    preview.alt = asset.name;
+    preview.decoding = "async";
+  }
+  preview.src = assetUrl(asset);
+  stage.replaceChildren(preview);
+  byId("media-lightbox-title").textContent = asset.name;
+  byId("media-lightbox-meta").textContent = `${assetTypeLabel(asset)} • ${asset.relative_path || "session-only file"}`;
+  state.lightboxAssetId = asset.id;
+  state.lightboxReturnFocus = trigger || document.activeElement;
+  trigger?.querySelector("video")?.pause();
+
+  if (!dialog.open) {
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else {
+      dialog.setAttribute("open", "");
+      byId("media-lightbox-close").focus();
+    }
+  }
+}
+
 function renderAssets() {
   const filter = byId("asset-filter").value.trim().toLowerCase();
   const grid = byId("asset-grid");
@@ -396,8 +496,19 @@ function renderAssets() {
     if (!asset.relative_path) card.classList.add("session-only");
     const thumb = card.querySelector(".asset-thumb");
     const preview = asset.type === "video" ? document.createElement("video") : document.createElement("img");
-    if (asset.type === "video") { preview.muted = true; preview.loop = true; preview.preload = "metadata"; preview.addEventListener("mouseenter", () => preview.play().catch(() => {})); preview.addEventListener("mouseleave", () => { preview.pause(); preview.currentTime = 0; }); }
+    if (asset.type === "video") {
+      preview.muted = true; preview.loop = true; preview.preload = "none";
+      preview.addEventListener("mouseenter", () => preview.play().catch(() => {}));
+      preview.addEventListener("mouseleave", () => { preview.pause(); preview.currentTime = 0; });
+    } else {
+      preview.loading = "lazy";
+      preview.decoding = "async";
+    }
     preview.src = assetUrl(asset); preview.alt = asset.name;
+    thumb.dataset.assetId = asset.id;
+    thumb.setAttribute("aria-label", `Open a large preview of ${asset.name}`);
+    thumb.title = `View ${asset.name} at full size`;
+    thumb.addEventListener("click", () => openAssetLightbox(asset.id, thumb));
     thumb.append(preview);
     card.querySelector("strong").textContent = asset.name;
     card.querySelector("span").textContent = `${assetTypeLabel(asset)} • ${asset.relative_path || "session only"}`;
@@ -628,7 +739,7 @@ function updatePlayhead(forceProgram = false) {
   if (!state.manifest) return;
   const percent = clamp(song.currentTime / duration(), 0, 1) * 100;
   byId("playhead").style.left = `${percent}%`;
-  byId("current-clock").value = clock(song.currentTime);
+  byId("current-clock").value = transportClock(song.currentTime);
   const cue = activeCaptionAt(song.currentTime);
   const activeVisual = activeVisualAt(song.currentTime);
   const visualOnly = !cue && activeVisual?.caption_id == null ? activeVisual : null;
@@ -890,7 +1001,7 @@ async function loadMusicFile(file) {
     };
     state.waveform = null; state.currentVisualId = null; song.currentTime = 0;
     byId("music-file-label").textContent = file.name;
-    byId("total-clock").value = clock(duration());
+    byId("total-clock").value = transportClock(duration());
     dirty(`Loaded ${file.name} • keep it in the project root for assembly`);
     renderAll(); await loadWaveform(file);
   } catch (error) { setStatus(error.message, true); }
@@ -941,11 +1052,12 @@ async function saveManifest() {
   const errors = validateForSave(payload);
   if (errors.length) { setStatus(`Cannot save: ${errors[0]}`, true); return; }
   const text = JSON.stringify(payload, null, 2) + "\n";
-  const filename = manifestFilename();
+  const filename = state.timelineFileName === "seed-manifest.json" ? manifestFilename() : state.timelineFileName;
   try {
     if ("showSaveFilePicker" in window) {
       state.saveHandle ||= await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: "Timeline JSON", accept: { "application/json": [".json"] } }] });
       const writable = await state.saveHandle.createWritable(); await writable.write(text); await writable.close();
+      setTimelineFileName(state.saveHandle.name || filename);
       setStatus("Saved editable timeline manifest");
     } else throw new Error("File System Access API unavailable");
   } catch (error) {
@@ -965,14 +1077,23 @@ async function openManifest(file) {
     const errors = validateForSave(payload);
     if (errors.length) throw new Error(errors[0]);
     state.manifest = payload; sortTimeline(); state.selectedCaptionId = payload.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.saveHandle = null; state.currentVisualId = null; state.replacingVisualId = null; state.libraryMode = "replace";
+    setTimelineFileName(file.name);
     if (state.musicObjectUrl) { URL.revokeObjectURL(state.musicObjectUrl); state.musicObjectUrl = null; }
-    song.src = `../${payload.soundtrack.relative_path}`; byId("total-clock").value = clock(duration());
+    song.src = `../${payload.soundtrack.relative_path}`; byId("total-clock").value = transportClock(duration());
     byId("music-file-label").textContent = payload.soundtrack.source_name || payload.soundtrack.relative_path.split("/").at(-1);
     renderAll(); setStatus(`Opened ${file.name}`); loadWaveform();
   } catch (error) { setStatus(error.message, true); }
 }
 
-function renderAll() { renderInspector(); renderCaptionTable(); renderAssets(); renderLinkedVisuals(); renderCueMediaManager(); switchMediaTab(state.mediaTab); resizeWaveform(); updatePlayhead(); }
+function renderAll() {
+  renderInspector();
+  renderCaptionTable();
+  renderLinkedVisuals();
+  byId("asset-count").textContent = `${state.manifest.assets.length} assets`;
+  switchMediaTab(state.mediaTab);
+  resizeWaveform();
+  updatePlayhead();
+}
 
 function addCaption() {
   const start = clamp(song.currentTime, 0, duration() - .5);
@@ -987,7 +1108,7 @@ function bindEvents() {
   song.addEventListener("pause", () => { byId("play-toggle").textContent = "▶"; byId("play-toggle").setAttribute("aria-label", "Play"); cancelAnimationFrame(state.playbackFrame); programVideo.pause(); updatePlayhead(); });
   song.addEventListener("timeupdate", updatePlayhead);
   song.addEventListener("loadedmetadata", () => {
-    byId("total-clock").value = clock(duration());
+    byId("total-clock").value = transportClock(duration());
     setPreviewPlaybackRate(byId("playback-rate").value, false);
     if (state.pendingSeek !== null) applySeek(state.pendingSeek);
   });
@@ -1015,7 +1136,14 @@ function bindEvents() {
   byId("jump-in").addEventListener("click", () => selectedTimingItem() && seekTo(selectedTimingItem().start)); byId("jump-out").addEventListener("click", () => selectedTimingItem() && seekTo(selectedTimingItem().end));
   for (const button of document.querySelectorAll(".rate-preset")) button.addEventListener("click", () => setPreviewPlaybackRate(button.dataset.rate));
   byId("playback-rate").addEventListener("change", (event) => setPreviewPlaybackRate(event.target.value));
+  for (const button of document.querySelectorAll(".clock-format-option")) button.addEventListener("click", () => {
+    try { localStorage.setItem("timeline-desk-clock-display", button.dataset.clockFormat); } catch (error) { console.warn("Could not save waveform clock preference", error); }
+    setClockDisplayMode(button.dataset.clockFormat);
+  });
   byId("caption-filter").addEventListener("input", renderCaptionTable); byId("asset-filter").addEventListener("input", renderAssets);
+  byId("media-lightbox-close").addEventListener("click", closeAssetLightbox);
+  byId("media-lightbox").addEventListener("click", (event) => { if (event.target === event.currentTarget) closeAssetLightbox(); });
+  byId("media-lightbox").addEventListener("close", releaseAssetLightbox);
   byId("add-caption").addEventListener("click", addCaption);
   byId("import-files").addEventListener("click", () => byId("asset-files-input").click()); byId("import-folder").addEventListener("click", () => byId("asset-folder-input").click());
   byId("asset-files-input").addEventListener("change", (event) => importFiles(event.target.files, false)); byId("asset-folder-input").addEventListener("change", (event) => importFiles(event.target.files, true));
@@ -1045,6 +1173,11 @@ function bindEvents() {
     if (document.visibilityState === "visible" && state.mediaTab === "library") refreshProjectAssets();
   });
   window.addEventListener("keydown", (event) => {
+    const lightbox = byId("media-lightbox");
+    if (lightbox.open || lightbox.hasAttribute("open")) {
+      if (event.key === "Escape" && typeof lightbox.close !== "function") closeAssetLightbox();
+      return;
+    }
     if (event.target.matches("input, textarea")) return;
     if (event.code === "Space") { event.preventDefault(); song.paused ? song.play() : song.pause(); }
     if (event.key === "ArrowLeft") { event.preventDefault(); seekTo(song.currentTime - (event.shiftKey ? 1 : .1)); }
@@ -1060,6 +1193,7 @@ async function init() {
     const response = await fetch("seed-manifest.json");
     if (!response.ok) throw new Error("Seed manifest could not be loaded.");
     state.manifest = await response.json(); state.selectedCaptionId = state.manifest.captions[0]?.id || null; state.selectedVisualOnlyId = null;
+    setTimelineFileName("seed-manifest.json");
     normalizeAssetTypes(state.manifest);
     state.manifest.visuals = state.manifest.visuals.map((visual) => ({ source_in: 0, source_out: null, ...visual }));
     sortTimeline();
@@ -1067,7 +1201,7 @@ async function init() {
     if (soundtrackPath) song.src = `../${soundtrackPath}`;
     else song.removeAttribute("src");
     byId("music-file-label").textContent = state.manifest.soundtrack.source_name || soundtrackPath.split("/").at(-1) || "No song loaded";
-    byId("total-clock").value = clock(soundtrackPath ? duration() : 0); bindEvents(); restoreRipplePreference(); setPreviewPlaybackRate(1, false); renderAll();
+    byId("total-clock").value = transportClock(soundtrackPath ? duration() : 0); bindEvents(); restoreRipplePreference(); restoreClockDisplayPreference(); setPreviewPlaybackRate(1, false); renderAll();
     if (soundtrackPath) loadWaveform(); else drawWaveform();
   } catch (error) {
     setStatus(`${error.message} Start the editor through the included local server.`, true);

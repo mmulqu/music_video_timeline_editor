@@ -14,13 +14,17 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Music Video Timeline Desk</title>
-    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="app.css?v=20260802.4" />
   </head>
   <body>
     <header class="topbar">
-      <div>
+      <div class="project-heading">
         <p class="eyebrow">LOCAL MUSIC VIDEO EDITOR</p>
         <h1>MUSIC VIDEO TIMELINE <span>Timeline Desk</span></h1>
+        <div class="timeline-file-readout">
+          <span>TIMELINE FILE</span>
+          <output id="timeline-file-name" aria-live="polite">seed-manifest.json</output>
+        </div>
       </div>
       <div class="topbar-actions">
         <div class="lock-badge" title="The song is never trimmed, processed, or re-encoded by this editor.">
@@ -106,7 +110,14 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
               </div>
               <small>Preview only · timing unchanged</small>
             </div>
-            <div class="clock"><output id="current-clock">00:00.000</output><span>/</span><output id="total-clock">00:00.000</output></div>
+            <div class="clock-panel">
+              <div class="clock"><output id="current-clock">00:00.000</output><span>/</span><output id="total-clock">00:00.000</output></div>
+              <div class="clock-format" role="group" aria-label="Waveform clock format">
+                <span>WAVEFORM CLOCK</span>
+                <button class="clock-format-option active" type="button" data-clock-format="timecode" aria-pressed="true" title="Show minutes, seconds, and milliseconds">MM:SS.mmm</button>
+                <button class="clock-format-option" type="button" data-clock-format="seconds" aria-pressed="false" title="Show total seconds for direct In/Out entry">SECONDS</button>
+              </div>
+            </div>
             <div class="transport-meta"><span id="caption-at-playhead">No caption at playhead</span></div>
           </div>
           <div class="transport-stage">
@@ -201,11 +212,29 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
 
     <template id="asset-template">
       <article class="asset-card">
-        <div class="asset-thumb"></div>
+        <button class="asset-thumb" type="button"></button>
         <div class="asset-info"><strong></strong><span></span></div>
         <button class="use-asset">Use at selected cue</button>
       </article>
     </template>
-    <script src="app.js"></script>
+
+    <dialog id="media-lightbox" class="media-lightbox" aria-labelledby="media-lightbox-title" aria-describedby="media-lightbox-meta">
+      <section class="media-lightbox-frame">
+        <header class="media-lightbox-header">
+          <div>
+            <p class="eyebrow">LIBRARY PREVIEW</p>
+            <h2 id="media-lightbox-title">Visual preview</h2>
+          </div>
+          <button id="media-lightbox-close" class="media-lightbox-close" type="button" aria-label="Close large preview">×</button>
+        </header>
+        <div id="media-lightbox-stage" class="media-lightbox-stage"></div>
+        <footer class="media-lightbox-footer">
+          <span id="media-lightbox-meta"></span>
+          <span>Esc to close</span>
+        </footer>
+      </section>
+    </dialog>
+
+    <script src="app.js?v=20260802.4"></script>
   </body>
 </html>

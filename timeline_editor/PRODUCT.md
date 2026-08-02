@@ -40,6 +40,9 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
 - Load a local music file, fingerprint it, and preview the synchronized edit.
 - Slow preview playback to a preset or custom rate for manual timing while
   preserving the soundtrack file and timeline timecodes unchanged.
+- Switch the waveform transport clock between `MM:SS.mmm` and total decimal
+  seconds so playhead values can be read directly in the same units used by
+  editable In/Out fields. This is a display preference only.
 - Ripple edited In/Out boundaries across adjacent visual beats by default so
   retiming cannot silently create black frames. Couple nearby lyric boundaries
   while preserving longer intentional lyric pauses and visual-only passages;

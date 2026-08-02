@@ -21,6 +21,9 @@ changing saved timecodes or the soundtrack. **Ripple boundaries** is enabled by
 default: image cuts stay continuous, nearby lyric edges move together, and
 longer intentional lyric pauses remain intact.
 
+The waveform clock can show either `MM:SS.mmm` or total decimal seconds. Seconds
+mode matches the units used by editable In/Out fields and changes display only.
+
 ## Run locally
 
 Requirements: Python 3.10+ and a current Chromium-based browser. FFmpeg and

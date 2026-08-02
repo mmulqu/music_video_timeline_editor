@@ -27,6 +27,10 @@ Preview-speed controls offer normal, 0.8×, 0.5×, 0.3×, and a custom rate. The
 change browser playback only, preserve pitch where supported, and never alter
 the soundtrack asset or saved timeline coordinates.
 
+The waveform clock has an explicit `MM:SS.mmm` / `SECONDS` display switch.
+Seconds mode mirrors the decimal units accepted by In/Out fields; switching
+formats never converts or edits stored timing data.
+
 In/Out edits use boundary ripple by default. Moving a row's In hands the same
 cut point to the previous visual; moving its Out hands the cut point to the next
 visual. Nearby lyric boundaries move with their neighboring caption, but longer
