@@ -16,9 +16,14 @@ another image requires the separate **+ Split cue** mode. It keeps the current
 visual group's outer In/Out and divides that coverage evenly across the images,
 without moving lyric or soundtrack timing.
 
+Use **Remove & merge** to delete a visual without leaving a black gap. The
+previous image absorbs its interval; deleting the first image extends the next
+one backward. The editor confirms before applying the change.
+
 The cue sheet interleaves lyrics with uncaptioned `VIS` rows, so every image
-interval can be found and edited. Preview playback can be slowed without
-changing saved timecodes or the soundtrack. **Ripple boundaries** is enabled by
+interval can be found and edited. Selecting a `VIS` row keeps that exact visual
+targeted while its interval is active, even when a lyric overlaps. Preview
+playback can be slowed without changing saved timecodes or the soundtrack. **Ripple boundaries** is enabled by
 default: image cuts stay continuous, nearby lyric edges move together, and
 longer intentional lyric pauses remain intact.
 

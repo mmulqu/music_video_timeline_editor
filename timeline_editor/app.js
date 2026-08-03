@@ -278,21 +278,51 @@ function renderLinkedVisuals() {
       timeInputs[2].addEventListener("change", (event) => updateVisualSource(visual.id, "source_in", event.target.value));
       timeInputs[3].addEventListener("change", (event) => updateVisualSource(visual.id, "source_out", event.target.value));
     }
+    const removal = visualRemovalContext(visual);
     const remove = document.createElement("button");
-    remove.className = "remove-visual"; remove.textContent = "×"; remove.title = "Remove visual beat";
+    remove.className = "remove-visual"; remove.textContent = "Remove";
+    remove.title = removal.survivor
+      ? `Remove ${visual.id} and extend ${removal.survivor.id} to cover its time`
+      : `Remove ${visual.id}; this cue will have no visual`;
     remove.addEventListener("click", () => removeVisual(visual.id));
     row.append(preview, info, remove); container.append(row);
   }
 }
 
+function visualRemovalContext(visual) {
+  const ordered = (visual.caption_id == null ? [...state.manifest.visuals] : visualsForCaption(visual.caption_id))
+    .sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+  const index = ordered.findIndex((item) => item.id === visual.id);
+  const previous = index > 0 ? ordered[index - 1] : null;
+  const next = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
+  return { previous, next, survivor: previous || next, direction: previous ? "previous" : next ? "next" : null };
+}
+
 function removeVisual(id) {
+  const visual = state.manifest.visuals.find((item) => item.id === id);
+  if (!visual) return;
+  const removal = visualRemovalContext(visual);
+  const assetName = assetById(visual.asset_id)?.name || "missing asset";
+  const survivorAssetName = removal.survivor ? assetById(removal.survivor.asset_id)?.name || "missing asset" : null;
+  const confirmation = removal.survivor
+    ? `Remove ${visual.id} (${assetName})?\n\n${removal.survivor.id} (${survivorAssetName}) will expand to cover its time. Caption and soundtrack timing will not change.`
+    : `Remove ${visual.id} (${assetName})?\n\nThis cue will have no visual. Caption and soundtrack timing will not change.`;
+  if (!window.confirm(confirmation)) return;
+
+  if (removal.direction === "previous") removal.survivor.end = Math.max(removal.survivor.end, visual.end);
+  if (removal.direction === "next") removal.survivor.start = Math.min(removal.survivor.start, visual.start);
   state.manifest.visuals = state.manifest.visuals.filter((item) => item.id !== id);
+  sortTimeline();
+  state.currentVisualId = null;
   if (state.replacingVisualId === id) state.replacingVisualId = null;
   if (state.selectedVisualOnlyId === id) {
     state.selectedVisualOnlyId = null;
     state.selectedCaptionId = activeCaptionAt(song.currentTime)?.id || state.manifest.captions[0]?.id || null;
   }
-  dirty("Visual beat removed"); renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable(); updateProgramMonitor(song.currentTime, activeCaptionAt(song.currentTime), true);
+  dirty(removal.survivor
+    ? `Removed ${visual.id} • merged its time into ${removal.survivor.id} • caption and song timing unchanged`
+    : `Removed ${visual.id} • this cue now has no visual • caption and song timing unchanged`);
+  renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable(); updateProgramMonitor(song.currentTime, activeCaptionAt(song.currentTime), true);
   renderInspector();
 }
 
@@ -316,7 +346,7 @@ function beginReplaceVisual(id) {
 }
 
 function replacementTargetForContext() {
-  return activeVisualAt(song.currentTime);
+  return selectedVisualOnly() || activeVisualAt(song.currentTime);
 }
 
 function openLibraryForReplacement() {
@@ -369,7 +399,13 @@ function renderCueMediaManager() {
     const actions = document.createElement("div"); actions.className = "cue-media-actions";
     const seekButton = document.createElement("button"); seekButton.className = "secondary"; seekButton.textContent = "Seek"; seekButton.addEventListener("click", () => seekTo(visual.start));
     const replaceButton = document.createElement("button"); replaceButton.className = "primary"; replaceButton.textContent = "Replace"; replaceButton.addEventListener("click", () => beginReplaceVisual(visual.id));
-    const removeButton = document.createElement("button"); removeButton.className = "secondary"; removeButton.textContent = "×"; removeButton.title = "Remove visual"; removeButton.addEventListener("click", () => removeVisual(visual.id));
+    const removal = visualRemovalContext(visual);
+    const removeButton = document.createElement("button"); removeButton.className = "remove-visual";
+    removeButton.textContent = removal.survivor ? "Remove & merge" : "Remove visual";
+    removeButton.title = removal.survivor
+      ? `Delete ${visual.id} and extend ${removal.survivor.id} to cover its time`
+      : `Delete ${visual.id}; this cue will have no visual`;
+    removeButton.addEventListener("click", () => removeVisual(visual.id));
     actions.append(seekButton, replaceButton, removeButton); card.append(previewWrap, meta, actions); list.append(card);
   }
 }
@@ -397,14 +433,25 @@ function renderCaptionTable() {
     row.classList.toggle("selected", selected);
     row.classList.toggle("at-playhead", playTime >= item.start && playTime < item.end);
     row.classList.toggle("visual-only-row", !isCaption);
+    row.tabIndex = 0;
+    row.setAttribute("aria-selected", String(selected));
+    row.setAttribute("aria-label", isCaption
+      ? `${item.id}, ${item.text}, ${clock(item.start)} to ${clock(item.end)}`
+      : `${item.id}, visual-only beat, ${visualName}, ${clock(item.start)} to ${clock(item.end)}. Select to edit or replace.`);
     if (isCaption) row.dataset.cueId = item.id;
     else row.dataset.visualId = item.id;
     const safeId = escapeHtml(item.id);
     const idCell = isCaption ? safeId : `${safeId}<span class="visual-only-badge">VIS</span>`;
     const lineCell = isCaption ? escapeHtml(item.text) : '<span class="blank-lyric" aria-label="No lyric caption">—</span>';
     const lineTitle = isCaption ? escapeHtml(item.text) : "No lyric caption during this visual interval";
-    row.innerHTML = `<td class="cue-id">${idCell}</td><td class="cue-time">${clock(item.start)}</td><td class="cue-time">${clock(item.end)}</td><td class="cue-line" title="${lineTitle}">${lineCell}</td><td class="cue-visual" title="${escapeHtml(visualName)}">${escapeHtml(visualName)}</td><td><button class="row-action" title="${isCaption ? "Seek to lyric" : "Seek to visual-only beat"}">↗</button></td>`;
-    row.addEventListener("click", () => isCaption ? selectCaption(item.id, true) : selectVisualOnly(item.id, true));
+    row.innerHTML = `<td class="cue-id">${idCell}</td><td class="cue-time">${clock(item.start)}</td><td class="cue-time">${clock(item.end)}</td><td class="cue-line" title="${lineTitle}">${lineCell}</td><td class="cue-visual" title="${escapeHtml(visualName)}">${escapeHtml(visualName)}</td><td><button class="row-action${isCaption ? "" : " visual-row-action"}" title="${isCaption ? "Seek to lyric" : "Select this visual-only beat to edit or replace"}" aria-label="${isCaption ? `Seek to ${item.id}` : `Edit ${item.id}`}">${isCaption ? "↗" : "EDIT"}</button></td>`;
+    const activateRow = () => isCaption ? selectCaption(item.id, true) : selectVisualOnly(item.id, true);
+    row.addEventListener("click", activateRow);
+    row.addEventListener("keydown", (event) => {
+      if (event.target !== row || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      activateRow();
+    });
     body.append(row);
   }
 }
@@ -770,18 +817,26 @@ function updatePlayhead(forceProgram = false) {
   byId("current-clock").value = transportClock(song.currentTime);
   const cue = activeCaptionAt(song.currentTime);
   const activeVisual = activeVisualAt(song.currentTime);
-  const visualOnly = !cue && activeVisual?.caption_id == null ? activeVisual : null;
-  byId("caption-at-playhead").textContent = cue
-    ? `${cue.id} — ${cue.text}`
-    : visualOnly
-      ? `${visualOnly.id} — no caption • ${assetById(visualOnly.asset_id)?.name || "missing asset"}`
+  const selectedStandaloneVisual = selectedVisualOnly();
+  const selectedStandaloneActive = Boolean(selectedStandaloneVisual
+    && song.currentTime >= selectedStandaloneVisual.start
+    && song.currentTime < selectedStandaloneVisual.end);
+  const visualOnly = selectedStandaloneActive
+    ? selectedStandaloneVisual
+    : !cue && activeVisual?.caption_id == null ? activeVisual : null;
+  byId("caption-at-playhead").textContent = selectedStandaloneActive
+    ? `${visualOnly.id} — selected VIS • ${assetById(visualOnly.asset_id)?.name || "missing asset"}${cue ? ` • ${cue.id} lyric also active` : ""}`
+    : cue
+      ? `${cue.id} — ${cue.text}`
+      : visualOnly
+        ? `${visualOnly.id} — no caption • ${assetById(visualOnly.asset_id)?.name || "missing asset"}`
       : "No caption or visual-only beat at playhead";
-  if (cue && byId("follow-playhead").checked && (cue.id !== state.selectedCaptionId || state.selectedVisualOnlyId)) {
+  if (!selectedStandaloneActive && cue && byId("follow-playhead").checked && (cue.id !== state.selectedCaptionId || state.selectedVisualOnlyId)) {
     state.selectedCaptionId = cue.id;
     state.selectedVisualOnlyId = null;
     renderInspector(); renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable();
     requestAnimationFrame(scrollSelectedTimelineRow);
-  } else if (visualOnly && byId("follow-playhead").checked && visualOnly.id !== state.selectedVisualOnlyId) {
+  } else if (!selectedStandaloneActive && visualOnly && byId("follow-playhead").checked && visualOnly.id !== state.selectedVisualOnlyId) {
     state.selectedCaptionId = null;
     state.selectedVisualOnlyId = visualOnly.id;
     renderInspector(); renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable();
@@ -792,11 +847,13 @@ function updatePlayhead(forceProgram = false) {
         ? state.manifest.captions.find((item) => item.id === row.dataset.cueId)
         : state.manifest.visuals.find((item) => item.id === row.dataset.visualId);
       row.classList.toggle("at-playhead", Boolean(rowItem && song.currentTime >= rowItem.start && song.currentTime < rowItem.end));
-      row.classList.toggle("selected", row.dataset.cueId === state.selectedCaptionId || row.dataset.visualId === state.selectedVisualOnlyId);
+      const selected = row.dataset.cueId === state.selectedCaptionId || row.dataset.visualId === state.selectedVisualOnlyId;
+      row.classList.toggle("selected", selected);
+      row.setAttribute("aria-selected", String(selected));
     }
   }
   const window = byId("cue-window");
-  const activeRow = cue || visualOnly;
+  const activeRow = selectedStandaloneActive ? selectedStandaloneVisual : cue || visualOnly;
   if (activeRow) { window.hidden = false; window.style.left = `${(activeRow.start / duration()) * 100}%`; window.style.width = `${((activeRow.end - activeRow.start) / duration()) * 100}%`; }
   else window.hidden = true;
   updateProgramMonitor(song.currentTime, cue, forceProgram);

@@ -18,7 +18,9 @@ timecodes and compact all-caps labels only for a few persistent controls.
 The playhead is the central instrument. Clicking the waveform seeks. The
 selected timeline row follows playback. Caption rows and visual-only rows share
 one chronological cue sheet; visual-only rows show a blank lyric cell and their
-own image In/Out so no media interval is hidden between lyrics. Keyboard
+own image In/Out so no media interval is hidden between lyrics. Clicking a VIS
+row pins that selection for its interval, ahead of an overlapping lyric and
+Follow playhead, so Current cue and Library actions target that exact visual. Keyboard
 shortcuts and explicit Set In/Set Out
 buttons perform the same timing action. Asset assignment is visible in the cue
 row and reflected in a separate visual-beat list.
@@ -59,6 +61,11 @@ active, disable asset selection instead of silently adding one. Adding another
 visual requires an explicit Split-cue mode: preserve the current visual group's
 outer In/Out, divide that coverage evenly across the ordered visuals, and leave
 caption and soundtrack timing unchanged.
+
+Expose deletion as a labeled Remove & merge action, never an unexplained icon.
+After confirmation, extend the previous visual through the deleted interval; if
+the first beat is removed, extend the next visual backward. Warn plainly when
+removing the only visual will leave the cue without an image.
 
 Keep the Library current without moving the playhead: scan the project `images`
 folder when Library opens, every 15 seconds while it remains visible, and through

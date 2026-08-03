@@ -33,11 +33,15 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
 - Edit caption text, start, and end times.
 - Show uncaptioned visual intervals as first-class, blank-lyric rows in the
   chronological cue sheet, where they can be sought, retimed, replaced, or
-  removed without inventing a caption association.
+  removed without inventing a caption association. An explicitly selected VIS
+  row remains selected while its interval is active, even if a lyric overlaps.
 - Add, retime, and associate still-image, animated-GIF, or video visual cues.
 - Replace the visual under the playhead without changing its timeline In/Out.
   Adding another visual is a separate explicit mode that evenly divides the
   cue's existing visual coverage without changing its outer or caption timing.
+- Remove a visual through an explicit Remove & merge action. Give its interval
+  to the previous visual, or to the next visual when removing the first beat,
+  without moving caption or soundtrack timing.
 - Load a local music file, fingerprint it, and preview the synchronized edit.
 - Slow preview playback to a preset or custom rate for manual timing while
   preserving the soundtrack file and timeline timecodes unchanged.
