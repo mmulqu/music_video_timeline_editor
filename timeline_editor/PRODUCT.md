@@ -34,7 +34,8 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
 - Show uncaptioned visual intervals as first-class, blank-lyric rows in the
   chronological cue sheet, where they can be sought, retimed, replaced, or
   removed without inventing a caption association. An explicitly selected VIS
-  row remains selected while its interval is active, even if a lyric overlaps.
+  row remains selected for editing regardless of interval length or an
+  overlapping lyric, until playback starts or the user seeks elsewhere.
 - Add, retime, and associate still-image, animated-GIF, or video visual cues.
 - Replace the visual under the playhead without changing its timeline In/Out.
   Adding another visual is a separate explicit mode that evenly divides the

@@ -7,7 +7,7 @@ const VIDEO_RE = /\.(mp4|mov|m4v|mkv|webm)$/i;
 const GIF_RE = /\.gif$/i;
 const MIN_INTERVAL_SECONDS = .01;
 const CAPTION_RIPPLE_TOLERANCE_SECONDS = .15;
-const state = { manifest: null, selectedCaptionId: null, selectedVisualOnlyId: null, currentVisualId: null, replacingVisualId: null, libraryMode: "replace", mediaTab: "cue", clockDisplayMode: "timecode", timelineFileName: "seed-manifest.json", saveHandle: null, objectUrls: new Map(), waveform: null, playbackFrame: null, musicObjectUrl: null, pendingSeek: null, gifRestart: 0, assetRefreshTimer: null, assetRefreshInFlight: false, lightboxAssetId: null, lightboxReturnFocus: null };
+const state = { manifest: null, selectedCaptionId: null, selectedVisualOnlyId: null, pinnedVisualOnlyId: null, currentVisualId: null, replacingVisualId: null, libraryMode: "replace", mediaTab: "cue", clockDisplayMode: "timecode", timelineFileName: "seed-manifest.json", saveHandle: null, objectUrls: new Map(), waveform: null, playbackFrame: null, musicObjectUrl: null, pendingSeek: null, gifRestart: 0, assetRefreshTimer: null, assetRefreshInFlight: false, lightboxAssetId: null, lightboxReturnFocus: null };
 const song = byId("song");
 const waveform = byId("waveform");
 const waveformContext = waveform.getContext("2d");
@@ -184,6 +184,7 @@ function setStatus(message, isError = false) {
 function selectCaption(id, seek = false) {
   state.selectedCaptionId = id;
   state.selectedVisualOnlyId = null;
+  state.pinnedVisualOnlyId = null;
   const cue = currentCaption();
   if (!cue) return;
   if (seek) seekTo(cue.start);
@@ -197,9 +198,10 @@ function selectCaption(id, seek = false) {
 function selectVisualOnly(id, seek = false) {
   state.selectedVisualOnlyId = id;
   state.selectedCaptionId = null;
+  state.pinnedVisualOnlyId = id;
   const visual = selectedVisualOnly();
   if (!visual) return;
-  if (seek) seekTo(visual.start);
+  if (seek) seekTo(visual.start, { preserveVisualSelection: true });
   renderInspector();
   renderCaptionTable();
   renderLinkedVisuals();
@@ -317,6 +319,7 @@ function removeVisual(id) {
   if (state.replacingVisualId === id) state.replacingVisualId = null;
   if (state.selectedVisualOnlyId === id) {
     state.selectedVisualOnlyId = null;
+    state.pinnedVisualOnlyId = null;
     state.selectedCaptionId = activeCaptionAt(song.currentTime)?.id || state.manifest.captions[0]?.id || null;
   }
   dirty(removal.survivor
@@ -397,7 +400,7 @@ function renderCueMediaManager() {
     const meta = document.createElement("div"); meta.className = "cue-media-meta";
     meta.innerHTML = `<strong>${escapeHtml(asset?.name || "Missing visual")}</strong><span>${assetTypeLabel(asset)} • ${clock(visual.start)}–${clock(visual.end)}</span>`;
     const actions = document.createElement("div"); actions.className = "cue-media-actions";
-    const seekButton = document.createElement("button"); seekButton.className = "secondary"; seekButton.textContent = "Seek"; seekButton.addEventListener("click", () => seekTo(visual.start));
+    const seekButton = document.createElement("button"); seekButton.className = "secondary"; seekButton.textContent = "Seek"; seekButton.addEventListener("click", () => seekTo(visual.start, { preserveVisualSelection: visual.id === state.selectedVisualOnlyId }));
     const replaceButton = document.createElement("button"); replaceButton.className = "primary"; replaceButton.textContent = "Replace"; replaceButton.addEventListener("click", () => beginReplaceVisual(visual.id));
     const removal = visualRemovalContext(visual);
     const removeButton = document.createElement("button"); removeButton.className = "remove-visual";
@@ -734,7 +737,8 @@ function applySeek(target) {
   }
 }
 
-function seekTo(seconds) {
+function seekTo(seconds, { preserveVisualSelection = false } = {}) {
+  if (!preserveVisualSelection) state.pinnedVisualOnlyId = null;
   const target = clamp(num(seconds, 0), 0, playableDuration());
   if (song.readyState < HTMLMediaElement.HAVE_METADATA || !Number.isFinite(song.duration)) {
     state.pendingSeek = target;
@@ -818,9 +822,10 @@ function updatePlayhead(forceProgram = false) {
   const cue = activeCaptionAt(song.currentTime);
   const activeVisual = activeVisualAt(song.currentTime);
   const selectedStandaloneVisual = selectedVisualOnly();
-  const selectedStandaloneActive = Boolean(selectedStandaloneVisual
+  const selectedStandalonePinned = Boolean(selectedStandaloneVisual && state.pinnedVisualOnlyId === selectedStandaloneVisual.id);
+  const selectedStandaloneActive = Boolean(selectedStandalonePinned || (selectedStandaloneVisual
     && song.currentTime >= selectedStandaloneVisual.start
-    && song.currentTime < selectedStandaloneVisual.end);
+    && song.currentTime < selectedStandaloneVisual.end));
   const visualOnly = selectedStandaloneActive
     ? selectedStandaloneVisual
     : !cue && activeVisual?.caption_id == null ? activeVisual : null;
@@ -1161,7 +1166,7 @@ async function openManifest(file) {
     payload.visuals = payload.visuals.map((visual) => ({ source_in: 0, source_out: null, ...visual }));
     const errors = validateForSave(payload);
     if (errors.length) throw new Error(errors[0]);
-    state.manifest = payload; sortTimeline(); state.selectedCaptionId = payload.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.saveHandle = null; state.currentVisualId = null; state.replacingVisualId = null; state.libraryMode = "replace";
+    state.manifest = payload; sortTimeline(); state.selectedCaptionId = payload.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.pinnedVisualOnlyId = null; state.saveHandle = null; state.currentVisualId = null; state.replacingVisualId = null; state.libraryMode = "replace";
     setTimelineFileName(file.name);
     if (state.musicObjectUrl) { URL.revokeObjectURL(state.musicObjectUrl); state.musicObjectUrl = null; }
     song.src = `../${payload.soundtrack.relative_path}`; byId("total-clock").value = transportClock(duration());
@@ -1189,7 +1194,7 @@ function addCaption() {
 
 function bindEvents() {
   byId("play-toggle").addEventListener("click", () => song.paused ? song.play() : song.pause());
-  song.addEventListener("play", () => { byId("play-toggle").textContent = "❚❚"; byId("play-toggle").setAttribute("aria-label", "Pause"); cancelAnimationFrame(state.playbackFrame); playbackLoop(); });
+  song.addEventListener("play", () => { state.pinnedVisualOnlyId = null; byId("play-toggle").textContent = "❚❚"; byId("play-toggle").setAttribute("aria-label", "Pause"); cancelAnimationFrame(state.playbackFrame); playbackLoop(); });
   song.addEventListener("pause", () => { byId("play-toggle").textContent = "▶"; byId("play-toggle").setAttribute("aria-label", "Play"); cancelAnimationFrame(state.playbackFrame); programVideo.pause(); updatePlayhead(); });
   song.addEventListener("timeupdate", updatePlayhead);
   song.addEventListener("loadedmetadata", () => {
@@ -1218,7 +1223,7 @@ function bindEvents() {
       : "Boundary ripple off • In/Out can create intentional gaps or overlaps");
   });
   byId("set-in").addEventListener("click", () => setBoundary("start")); byId("set-out").addEventListener("click", () => setBoundary("end"));
-  byId("jump-in").addEventListener("click", () => selectedTimingItem() && seekTo(selectedTimingItem().start)); byId("jump-out").addEventListener("click", () => selectedTimingItem() && seekTo(selectedTimingItem().end));
+  byId("jump-in").addEventListener("click", () => selectedTimingItem() && seekTo(selectedTimingItem().start, { preserveVisualSelection: Boolean(selectedVisualOnly()) })); byId("jump-out").addEventListener("click", () => selectedTimingItem() && seekTo(selectedTimingItem().end, { preserveVisualSelection: Boolean(selectedVisualOnly()) }));
   for (const button of document.querySelectorAll(".rate-preset")) button.addEventListener("click", () => setPreviewPlaybackRate(button.dataset.rate));
   byId("playback-rate").addEventListener("change", (event) => setPreviewPlaybackRate(event.target.value));
   for (const button of document.querySelectorAll(".clock-format-option")) button.addEventListener("click", () => {
@@ -1236,7 +1241,7 @@ function bindEvents() {
   byId("library-media-tab").addEventListener("click", openLibraryForReplacement);
   byId("refresh-assets").addEventListener("click", () => refreshProjectAssets({ manual: true }));
   byId("replace-program-visual").addEventListener("click", () => {
-    const visual = activeVisualAt(song.currentTime);
+    const visual = replacementTargetForContext();
     if (!visual) { setStatus("There is no visual under the playhead to replace.", true); return; }
     beginReplaceVisual(visual.id);
   });
@@ -1277,7 +1282,7 @@ async function init() {
   try {
     const response = await fetch("seed-manifest.json");
     if (!response.ok) throw new Error("Seed manifest could not be loaded.");
-    state.manifest = await response.json(); state.selectedCaptionId = state.manifest.captions[0]?.id || null; state.selectedVisualOnlyId = null;
+    state.manifest = await response.json(); state.selectedCaptionId = state.manifest.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.pinnedVisualOnlyId = null;
     setTimelineFileName("seed-manifest.json");
     normalizeAssetTypes(state.manifest);
     state.manifest.visuals = state.manifest.visuals.map((visual) => ({ source_in: 0, source_out: null, ...visual }));

@@ -22,7 +22,8 @@ one backward. The editor confirms before applying the change.
 
 The cue sheet interleaves lyrics with uncaptioned `VIS` rows, so every image
 interval can be found and edited. Selecting a `VIS` row keeps that exact visual
-targeted while its interval is active, even when a lyric overlaps. Preview
+targeted even for extremely short intervals or overlapping lyrics. Playback or
+an independent seek resumes normal Follow-playhead selection. Preview
 playback can be slowed without changing saved timecodes or the soundtrack. **Ripple boundaries** is enabled by
 default: image cuts stay continuous, nearby lyric edges move together, and
 longer intentional lyric pauses remain intact.

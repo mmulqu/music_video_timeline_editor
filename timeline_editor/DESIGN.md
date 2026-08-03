@@ -19,8 +19,9 @@ The playhead is the central instrument. Clicking the waveform seeks. The
 selected timeline row follows playback. Caption rows and visual-only rows share
 one chronological cue sheet; visual-only rows show a blank lyric cell and their
 own image In/Out so no media interval is hidden between lyrics. Clicking a VIS
-row pins that selection for its interval, ahead of an overlapping lyric and
-Follow playhead, so Current cue and Library actions target that exact visual. Keyboard
+row pins that editing selection ahead of an overlapping lyric and Follow
+playhead, so even a single-frame beat remains available to Current cue and
+Library actions. Starting playback or seeking elsewhere releases the pin. Keyboard
 shortcuts and explicit Set In/Set Out
 buttons perform the same timing action. Asset assignment is visible in the cue
 row and reflected in a separate visual-beat list.
