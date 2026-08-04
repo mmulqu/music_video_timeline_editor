@@ -14,7 +14,7 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Music Video Timeline Desk</title>
-    <link rel="stylesheet" href="app.css?v=20260802.7" />
+    <link rel="stylesheet" href="app.css?v=20260803.10" />
   </head>
   <body>
     <header class="topbar">
@@ -72,6 +72,7 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
           <button id="jump-in" class="quiet">Jump to In</button>
           <button id="jump-out" class="quiet">Jump to Out</button>
         </div>
+        <button id="delete-selected-row" class="remove-visual selected-row-delete" type="button" hidden>Delete selected row</button>
 
         <label class="field-label" for="caption-notes">Notes <span>saved in output JSON</span></label>
         <textarea id="caption-notes" rows="3" placeholder="Timing or visual note…"></textarea>
@@ -159,7 +160,8 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
             </div>
             <div class="sheet-tools">
               <label class="search"><span>⌕</span><input id="caption-filter" type="search" placeholder="Find lyric, visual, ID, or section" /></label>
-              <button id="add-caption" class="secondary">+ Caption</button>
+              <button id="add-visual-beat" class="secondary insert-visual-action" type="button" title="Split the image under the playhead and choose a new image for the second part">+ VIS at playhead</button>
+              <button id="add-caption" class="secondary" title="Add an actual lyric caption">+ Lyric caption</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -235,6 +237,6 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
       </section>
     </dialog>
 
-    <script src="app.js?v=20260802.8"></script>
+    <script src="app.js?v=20260803.10"></script>
   </body>
 </html>

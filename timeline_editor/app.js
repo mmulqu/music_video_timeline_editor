@@ -7,7 +7,7 @@ const VIDEO_RE = /\.(mp4|mov|m4v|mkv|webm)$/i;
 const GIF_RE = /\.gif$/i;
 const MIN_INTERVAL_SECONDS = .01;
 const CAPTION_RIPPLE_TOLERANCE_SECONDS = .15;
-const state = { manifest: null, selectedCaptionId: null, selectedVisualOnlyId: null, pinnedVisualOnlyId: null, currentVisualId: null, replacingVisualId: null, libraryMode: "replace", mediaTab: "cue", clockDisplayMode: "timecode", timelineFileName: "seed-manifest.json", saveHandle: null, objectUrls: new Map(), waveform: null, playbackFrame: null, musicObjectUrl: null, pendingSeek: null, gifRestart: 0, assetRefreshTimer: null, assetRefreshInFlight: false, lightboxAssetId: null, lightboxReturnFocus: null };
+const state = { manifest: null, selectedCaptionId: null, selectedVisualOnlyId: null, pinnedVisualOnlyId: null, currentVisualId: null, replacingVisualId: null, insertingVisualId: null, insertAtTime: null, libraryMode: "replace", mediaTab: "cue", clockDisplayMode: "timecode", timelineFileName: "seed-manifest.json", saveHandle: null, objectUrls: new Map(), waveform: null, playbackFrame: null, musicObjectUrl: null, pendingSeek: null, gifRestart: 0, assetRefreshTimer: null, assetRefreshInFlight: false, lightboxAssetId: null, lightboxReturnFocus: null };
 const song = byId("song");
 const waveform = byId("waveform");
 const waveformContext = waveform.getContext("2d");
@@ -213,8 +213,10 @@ function renderInspector() {
   const cue = currentCaption();
   const visual = selectedVisualOnly();
   const captionText = byId("caption-text");
+  const deleteRow = byId("delete-selected-row");
   if (visual) {
     const asset = assetById(visual.asset_id);
+    const removal = visualRemovalContext(visual);
     byId("selected-kind").textContent = "SELECTED VISUAL";
     byId("selected-id").textContent = visual.id;
     byId("selected-section").textContent = `Visual-only beat • ${asset?.name || "missing asset"}`;
@@ -231,9 +233,23 @@ function renderInspector() {
       : "In/Out move only this image. A gap can produce black frames; the song and captions stay unchanged.";
     byId("set-in").title = "Make this image begin at the current song position";
     byId("set-out").title = "Make this image end at the current song position";
+    deleteRow.hidden = false;
+    deleteRow.textContent = removal.survivor ? `Delete ${visual.id} & merge` : `Delete ${visual.id}`;
+    deleteRow.title = removal.survivor
+      ? `Remove this visual and extend ${removal.survivor.id} through its interval`
+      : "Remove this visual beat";
     return;
   }
-  if (!cue) return;
+  if (!cue) {
+    deleteRow.hidden = true;
+    byId("selected-kind").textContent = "NO SELECTION";
+    byId("selected-id").textContent = "—";
+    byId("selected-section").textContent = "Choose a caption or VIS row from the cue sheet.";
+    captionText.value = ""; captionText.disabled = true;
+    byId("caption-start").value = ""; byId("caption-end").value = ""; byId("caption-notes").value = "";
+    byId("selected-duration").textContent = "—";
+    return;
+  }
   byId("selected-kind").textContent = "SELECTED CAPTION";
   byId("selected-id").textContent = cue.id;
   byId("selected-section").textContent = cue.section || "Unsectioned";
@@ -250,6 +266,12 @@ function renderInspector() {
     : "In/Out move only this caption. Neighboring image and lyric edges stay unchanged; the song is never changed.";
   byId("set-in").title = "Make this caption appear at the current song position";
   byId("set-out").title = "Make this caption disappear at the current song position";
+  const linkedVisualCount = visualsForCaption(cue.id).length;
+  deleteRow.hidden = false;
+  deleteRow.textContent = `Delete ${cue.id} caption`;
+  deleteRow.title = linkedVisualCount
+    ? `Remove this caption and keep its ${linkedVisualCount} visual beat${linkedVisualCount === 1 ? "" : "s"} as standalone VIS rows`
+    : "Remove this caption without changing any visual or soundtrack timing";
 }
 
 function renderLinkedVisuals() {
@@ -289,6 +311,44 @@ function renderLinkedVisuals() {
     remove.addEventListener("click", () => removeVisual(visual.id));
     row.append(preview, info, remove); container.append(row);
   }
+}
+
+function removeCaption(id) {
+  const cue = state.manifest.captions.find((item) => item.id === id);
+  if (!cue) return;
+  const linked = visualsForCaption(id).sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+  const cueText = String(cue.text || "");
+  const preview = cueText.length > 72 ? `${cueText.slice(0, 69)}…` : cueText;
+  const visualOutcome = linked.length
+    ? `${linked.length} linked visual beat${linked.length === 1 ? "" : "s"} will remain at the same times as standalone VIS rows.`
+    : "No visual beats are attached to this caption.";
+  if (!window.confirm(`Delete ${cue.id} caption “${preview}”?\n\n${visualOutcome}\nLyrics and soundtrack timing elsewhere will not change.`)) return;
+
+  for (const visual of linked) {
+    visual.caption_id = null;
+    const auditNote = `Caption ${cue.id} deleted in Timeline Desk; visual preserved as a standalone VIS beat.`;
+    visual.notes = visual.notes ? `${visual.notes} ${auditNote}` : auditNote;
+  }
+  state.manifest.captions = state.manifest.captions.filter((item) => item.id !== id);
+  sortTimeline();
+  state.currentVisualId = null;
+  state.replacingVisualId = null;
+  state.insertingVisualId = null;
+  state.insertAtTime = null;
+  state.libraryMode = "replace";
+  if (linked.length) {
+    state.selectedCaptionId = null;
+    state.selectedVisualOnlyId = linked[0].id;
+    state.pinnedVisualOnlyId = linked[0].id;
+  } else {
+    const nextCue = state.manifest.captions.find((item) => item.start >= cue.start) || state.manifest.captions.at(-1) || null;
+    state.selectedCaptionId = nextCue?.id || null;
+    state.selectedVisualOnlyId = null;
+    state.pinnedVisualOnlyId = null;
+  }
+  dirty(`Deleted ${cue.id} caption${linked.length ? ` • preserved ${linked.length} visual beat${linked.length === 1 ? "" : "s"} as VIS rows` : ""} • song timing unchanged`);
+  renderInspector(); renderLinkedVisuals(); renderCaptionTable(); switchMediaTab("cue"); updatePlayhead(true);
+  requestAnimationFrame(scrollSelectedTimelineRow);
 }
 
 function visualRemovalContext(visual) {
@@ -345,6 +405,8 @@ function switchMediaTab(tab) {
 function beginReplaceVisual(id) {
   state.libraryMode = "replace";
   state.replacingVisualId = id;
+  state.insertingVisualId = null;
+  state.insertAtTime = null;
   switchMediaTab("library");
 }
 
@@ -355,6 +417,8 @@ function replacementTargetForContext() {
 function openLibraryForReplacement() {
   state.libraryMode = "replace";
   state.replacingVisualId = replacementTargetForContext()?.id || null;
+  state.insertingVisualId = null;
+  state.insertAtTime = null;
   switchMediaTab("library");
 }
 
@@ -365,7 +429,28 @@ function openLibraryForNewBeat() {
   }
   state.libraryMode = "add";
   state.replacingVisualId = null;
+  state.insertingVisualId = null;
+  state.insertAtTime = null;
   switchMediaTab("library");
+}
+
+function openLibraryForVisualBeatAtPlayhead() {
+  const target = activeVisualAt(song.currentTime);
+  if (!target) {
+    setStatus("No image covers the playhead. Seek inside an existing image, then choose + VIS at playhead.", true);
+    return;
+  }
+  const splitTime = Number(song.currentTime.toFixed(6));
+  if (splitTime <= target.start + MIN_INTERVAL_SECONDS || splitTime >= target.end - MIN_INTERVAL_SECONDS) {
+    setStatus(`Move the playhead at least ${MIN_INTERVAL_SECONDS.toFixed(2)}s inside ${target.id}, then add the VIS beat.`, true);
+    return;
+  }
+  state.libraryMode = "insert";
+  state.replacingVisualId = null;
+  state.insertingVisualId = target.id;
+  state.insertAtTime = splitTime;
+  switchMediaTab("library");
+  setStatus(`Choose an image for the new VIS beat at ${clock(splitTime)}. Lyrics and song timing will stay fixed.`);
 }
 
 function renderCueMediaManager() {
@@ -528,17 +613,27 @@ function renderAssets() {
   const grid = byId("asset-grid");
   grid.replaceChildren();
   const replacing = state.libraryMode === "replace";
+  const inserting = state.libraryMode === "insert";
   const cue = currentCaption();
   const cueVisualCount = cue ? visualsForCaption(cue.id).length : 0;
   const target = replacing ? state.manifest.visuals.find((visual) => visual.id === state.replacingVisualId) : null;
   const targetAsset = target ? assetById(target.asset_id) : null;
+  const insertTarget = inserting ? state.manifest.visuals.find((visual) => visual.id === state.insertingVisualId) : null;
+  const insertTime = Number(state.insertAtTime);
+  const insertReady = Boolean(insertTarget && Number.isFinite(insertTime)
+    && insertTime > insertTarget.start + MIN_INTERVAL_SECONDS
+    && insertTime < insertTarget.end - MIN_INTERVAL_SECONDS);
   const modePanel = byId("replace-mode");
   modePanel.classList.toggle("add-mode", !replacing);
-  modePanel.classList.toggle("blocked-mode", replacing && !target);
+  modePanel.classList.toggle("blocked-mode", (replacing && !target) || (inserting && !insertReady));
   if (replacing && target) {
     byId("library-mode-label").textContent = `Replacing ${target.id} • ${clock(target.start)}–${clock(target.end)} • ${targetAsset?.name || "missing asset"}`;
   } else if (replacing) {
     byId("library-mode-label").textContent = "No visual under the playhead. Seek to a visual before replacing it.";
+  } else if (inserting && insertReady) {
+    byId("library-mode-label").textContent = `New VIS at ${clock(insertTime)} • splitting ${insertTarget.id} • lyrics and song timing stay fixed`;
+  } else if (inserting) {
+    byId("library-mode-label").textContent = "The playhead is too close to an image boundary. Go Back and choose a point inside the image.";
   } else if (!cue) {
     byId("library-mode-label").textContent = "Select a lyric row before adding another visual.";
   } else {
@@ -572,8 +667,10 @@ function renderAssets() {
     const useButton = card.querySelector(".use-asset");
     useButton.textContent = replacing
       ? (target ? `Replace ${target.id}` : "Seek to a visual first")
-      : cue ? (cueVisualCount ? `Split ${cue.id} with this visual` : `Add first visual to ${cue.id}`) : "Select a lyric row first";
-    useButton.disabled = replacing ? !target : !cue;
+      : inserting
+        ? (insertReady ? `Add VIS at ${clock(insertTime)}` : "Choose a valid playhead point")
+        : cue ? (cueVisualCount ? `Split ${cue.id} with this visual` : `Add first visual to ${cue.id}`) : "Select a lyric row first";
+    useButton.disabled = replacing ? !target : inserting ? !insertReady : !cue;
     if (!useButton.disabled) useButton.addEventListener("click", () => useAssetForCue(asset.id));
     grid.append(card);
   }
@@ -595,6 +692,10 @@ function useAssetForCue(assetId) {
     switchMediaTab("cue");
     return;
   }
+  if (state.libraryMode === "insert") {
+    if (insertVisualAtPlayhead(assetId)) switchMediaTab("cue");
+    return;
+  }
   if (!currentCaption()) {
     setStatus("Select a lyric row before adding a new visual beat.", true);
     return;
@@ -607,6 +708,38 @@ function nextVisualId() {
   let highest = 0;
   for (const visual of state.manifest.visuals) highest = Math.max(highest, Number.parseInt(String(visual.id).replace(/\D/g, ""), 10) || 0);
   return `V${String(highest + 1).padStart(4, "0")}`;
+}
+
+function insertVisualAtPlayhead(assetId) {
+  const target = state.manifest.visuals.find((visual) => visual.id === state.insertingVisualId);
+  const splitTime = Number(state.insertAtTime);
+  if (!target || !Number.isFinite(splitTime)
+    || splitTime <= target.start + MIN_INTERVAL_SECONDS
+    || splitTime >= target.end - MIN_INTERVAL_SECONDS) {
+    setStatus("The new visual was not added. Return to the timeline and choose a point inside an existing image.", true);
+    return false;
+  }
+  const originalEnd = target.end;
+  const originalTransition = target.transition || "hard";
+  target.end = splitTime;
+  target.transition = "hard";
+  const added = {
+    id: nextVisualId(), caption_id: null, asset_id: assetId,
+    start: splitTime, end: originalEnd, source_in: 0, source_out: null,
+    playback_rate: 1, motion: "static", transition: originalTransition,
+    notes: `Inserted at the playhead by splitting ${target.id}. Original visual coverage, lyric timing, and soundtrack timing preserved.`,
+  };
+  state.manifest.visuals.push(added);
+  sortTimeline();
+  state.currentVisualId = null;
+  state.insertingVisualId = null;
+  state.insertAtTime = null;
+  state.selectedCaptionId = null;
+  state.selectedVisualOnlyId = added.id;
+  state.pinnedVisualOnlyId = added.id;
+  dirty(`Added ${added.id} at ${clock(splitTime)} • split ${target.id} • lyrics and song timing unchanged`);
+  renderInspector(); renderLinkedVisuals(); renderCueMediaManager(); renderCaptionTable(); updatePlayhead(true);
+  return true;
 }
 
 function addVisualAtCue(assetId) {
@@ -1122,7 +1255,8 @@ function validateForSave(payload) {
   }
   let previousStart = -1;
   for (const cue of payload.captions) {
-    if (!cue.text.trim() || cue.start < 0 || cue.end <= cue.start || cue.end > payload.soundtrack.duration_seconds) errors.push(`${cue.id} has invalid text or timing`);
+    if (!String(cue.text || "").trim()) errors.push(`${cue.id} has no lyric text. Use + VIS at playhead for image-only beats.`);
+    else if (!Number.isFinite(cue.start) || !Number.isFinite(cue.end) || cue.start < 0 || cue.end <= cue.start || cue.end > payload.soundtrack.duration_seconds) errors.push(`${cue.id} has invalid timing: In ${cue.start}, Out ${cue.end}`);
     if (cue.start < previousStart) errors.push(`${cue.id} is out of chronological order`);
     previousStart = cue.start;
   }
@@ -1166,7 +1300,7 @@ async function openManifest(file) {
     payload.visuals = payload.visuals.map((visual) => ({ source_in: 0, source_out: null, ...visual }));
     const errors = validateForSave(payload);
     if (errors.length) throw new Error(errors[0]);
-    state.manifest = payload; sortTimeline(); state.selectedCaptionId = payload.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.pinnedVisualOnlyId = null; state.saveHandle = null; state.currentVisualId = null; state.replacingVisualId = null; state.libraryMode = "replace";
+    state.manifest = payload; sortTimeline(); state.selectedCaptionId = payload.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.pinnedVisualOnlyId = null; state.saveHandle = null; state.currentVisualId = null; state.replacingVisualId = null; state.insertingVisualId = null; state.insertAtTime = null; state.libraryMode = "replace";
     setTimelineFileName(file.name);
     if (state.musicObjectUrl) { URL.revokeObjectURL(state.musicObjectUrl); state.musicObjectUrl = null; }
     song.src = `../${payload.soundtrack.relative_path}`; byId("total-clock").value = transportClock(duration());
@@ -1235,6 +1369,13 @@ function bindEvents() {
   byId("media-lightbox").addEventListener("click", (event) => { if (event.target === event.currentTarget) closeAssetLightbox(); });
   byId("media-lightbox").addEventListener("close", releaseAssetLightbox);
   byId("add-caption").addEventListener("click", addCaption);
+  byId("add-visual-beat").addEventListener("click", openLibraryForVisualBeatAtPlayhead);
+  byId("delete-selected-row").addEventListener("click", () => {
+    const visual = selectedVisualOnly();
+    const cue = currentCaption();
+    if (visual) removeVisual(visual.id);
+    else if (cue) removeCaption(cue.id);
+  });
   byId("import-files").addEventListener("click", () => byId("asset-files-input").click()); byId("import-folder").addEventListener("click", () => byId("asset-folder-input").click());
   byId("asset-files-input").addEventListener("change", (event) => importFiles(event.target.files, false)); byId("asset-folder-input").addEventListener("change", (event) => importFiles(event.target.files, true));
   byId("cue-media-tab").addEventListener("click", () => switchMediaTab("cue"));
@@ -1282,7 +1423,7 @@ async function init() {
   try {
     const response = await fetch("seed-manifest.json");
     if (!response.ok) throw new Error("Seed manifest could not be loaded.");
-    state.manifest = await response.json(); state.selectedCaptionId = state.manifest.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.pinnedVisualOnlyId = null;
+    state.manifest = await response.json(); state.selectedCaptionId = state.manifest.captions[0]?.id || null; state.selectedVisualOnlyId = null; state.pinnedVisualOnlyId = null; state.insertingVisualId = null; state.insertAtTime = null;
     setTimelineFileName("seed-manifest.json");
     normalizeAssetTypes(state.manifest);
     state.manifest.visuals = state.manifest.visuals.map((visual) => ({ source_in: 0, source_out: null, ...visual }));

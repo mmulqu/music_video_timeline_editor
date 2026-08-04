@@ -26,6 +26,13 @@ shortcuts and explicit Set In/Set Out
 buttons perform the same timing action. Asset assignment is visible in the cue
 row and reflected in a separate visual-beat list.
 
+Adding an image-only beat is playhead-first: seek to the intended cut, choose
+**+ VIS at playhead**, then choose the image from Library. Split the visual
+under the playhead into two continuous intervals and make the new second
+interval a first-class VIS row. Never create a dummy caption or move lyric and
+soundtrack timing. Keep **+ Lyric caption** explicitly named so it cannot be
+mistaken for this visual operation.
+
 Preview-speed controls offer normal, 0.8×, 0.5×, 0.3×, and a custom rate. They
 change browser playback only, preserve pitch where supported, and never alter
 the soundtrack asset or saved timeline coordinates.
@@ -66,7 +73,14 @@ caption and soundtrack timing unchanged.
 Expose deletion as a labeled Remove & merge action, never an unexplained icon.
 After confirmation, extend the previous visual through the deleted interval; if
 the first beat is removed, extend the next visual backward. Warn plainly when
-removing the only visual will leave the cue without an image.
+removing the only visual will leave the cue without an image. A selected VIS
+also exposes this action beside its timing controls.
+
+Use the same inspector position for deletion of either selected-row type. For a
+caption, name the caption ID in the action and confirmation, then detach linked
+images into standalone VIS rows without moving them. For a VIS, name the VIS ID
+and the neighboring image that will absorb its interval. Never make “delete
+caption” imply “delete its images.”
 
 Keep the Library current without moving the playhead: scan the project `images`
 folder when Library opens, every 15 seconds while it remains visible, and through

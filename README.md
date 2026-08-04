@@ -20,6 +20,16 @@ Use **Remove & merge** to delete a visual without leaving a black gap. The
 previous image absorbs its interval; deleting the first image extends the next
 one backward. The editor confirms before applying the change.
 
+To place a new image cut anywhere, park the playhead inside the current image,
+click **+ VIS at playhead**, and choose an asset from Library. The current image
+ends at that exact point and the new caption-free VIS occupies the remainder of
+its interval; lyric and soundtrack timing do not move. Select any VIS row to
+find the matching **Delete VIS & merge** action in the left inspector.
+
+The same inspector action can delete any selected caption. Its linked images
+are retained at the exact same times and become standalone `VIS` rows; deleting
+a caption never silently deletes its imagery or changes the soundtrack.
+
 The cue sheet interleaves lyrics with uncaptioned `VIS` rows, so every image
 interval can be found and edited. Selecting a `VIS` row keeps that exact visual
 targeted even for extremely short intervals or overlapping lyrics. Playback or
@@ -57,7 +67,8 @@ Then open <http://127.0.0.1:8878/timeline_editor/>.
    **Ripple boundaries** only when you intentionally want a gap or overlap.
 3. Put reusable visual files in `images/`. Library scans that directory when it
    opens, every 15 seconds while visible, and whenever **Refresh** is pressed.
-4. Seek to a caption or blank-lyric `VIS` row and choose a Library asset to
+4. Use **+ VIS at playhead** for a new image cut, or seek to a caption or
+   blank-lyric `VIS` row and choose a Library asset to
    replace it without retiming.
 5. Save the timeline JSON.
 

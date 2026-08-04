@@ -37,12 +37,19 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
   row remains selected for editing regardless of interval length or an
   overlapping lyric, until playback starts or the user seeks elsewhere.
 - Add, retime, and associate still-image, animated-GIF, or video visual cues.
+- Insert a caption-free visual beat at the exact playhead by splitting the
+  image currently covering that point. Preserve the original outer coverage,
+  every lyric boundary, and soundtrack timing.
 - Replace the visual under the playhead without changing its timeline In/Out.
   Adding another visual is a separate explicit mode that evenly divides the
   cue's existing visual coverage without changing its outer or caption timing.
 - Remove a visual through an explicit Remove & merge action. Give its interval
   to the previous visual, or to the next visual when removing the first beat,
-  without moving caption or soundtrack timing.
+  without moving caption or soundtrack timing. Expose the action in the
+  selected-VIS inspector as well as the Current cue media manager.
+- Delete any selected lyric caption without deleting or retiming its images.
+  Convert linked images into standalone VIS rows at their existing intervals,
+  and leave every other caption and the soundtrack unchanged.
 - Load a local music file, fingerprint it, and preview the synchronized edit.
 - Slow preview playback to a preset or custom rate for manual timing while
   preserving the soundtrack file and timeline timecodes unchanged.
