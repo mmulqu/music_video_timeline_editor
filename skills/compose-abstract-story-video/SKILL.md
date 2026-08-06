@@ -24,6 +24,10 @@ rejected or missing generated assets.
   [references/editing-supplied-images.md](references/editing-supplied-images.md)
   when the user provides an existing numbered image sequence or asks for an
   edit without image generation.
+- Read
+  [references/timeline-rendering.md](references/timeline-rendering.md)
+  when rendering an existing timeline editor JSON, mixed still/GIF/video media,
+  lyric captions, a locked supplied song, or a revision of an approved master.
 
 ## Choose the execution path
 
@@ -61,6 +65,8 @@ Treat FFmpeg and ffprobe as first-class dependencies:
 
 - Probe exact dimensions, frame rates, codecs, durations, sample rates, and
   channel layouts with ffprobe.
+- Map video and audio streams explicitly. A music file may contain album art or
+  another attached video stream; never rely on FFmpeg's automatic mapping.
 - Build slow still motion with `zoompan` or equivalent deterministic filters.
 - Join shots with `xfade`; use hard cuts where the manifest requests them.
 - For reliable `xfade`, first render every still-motion shot as a real
@@ -73,6 +79,9 @@ Treat FFmpeg and ffprobe as first-class dependencies:
 - Render a low-resolution proxy before the final master.
 - Prefer NVENC for fast previews when available. Prefer portable H.264/x264 for
   the default final unless the user selects another delivery codec.
+- After motion and final effects, explicitly set square pixels and a portable
+  delivery format such as `setsar=1,format=yuv420p`; verify SAR, DAR, pixel
+  format, and color range with ffprobe instead of judging appearance alone.
 
 Generate filter graphs from the manifest. Do not hand-edit a complex command
 without writing the resolved command and timing data into the run report.
@@ -245,6 +254,17 @@ never resolve timing by changing the song. Generate:
 - a 960x540 review proxy
 - a draft QA report
 
+For an editor-authored timeline, snapshot and hash the exact JSON before
+rendering. Reproduce the editor's documented selection rule for overlapping
+visuals, then resolve it into frame-quantized visible segments. Do not assume
+that array order, caption linkage, or a long underlying beat makes overlaps
+irrelevant. Detect uncovered frames; never introduce black by accident.
+
+Treat GIFs and videos as time-based media. Loop GIFs only when the manifest says
+to, and honor video source-in, source-out, and playback rate. For a segment cut
+from the middle of a visual, advance the source position by the elapsed timeline
+time multiplied by playback rate.
+
 Keep motion restrained unless the treatment requires rupture. Use the shortest
 holds and hardest cuts at the narrative peak, then restore duration and space.
 Vary motion direction and magnitude from the image composition; uniform
@@ -265,6 +285,12 @@ After draft approval, render the final from the same approved assets. Verify:
 - locked supplied soundtrack preserved without trimming, processing, or
   re-encoding, verified against the source stream
 - no missing or duplicated shots
+- GIFs and videos visibly change across two interior sample frames; keep QA
+  samples at least 2-3 frames away from edit boundaries
+- square-pixel output with expected display aspect ratio, portable pixel format,
+  and intentional color range
+- no unintended black intervals; distinguish a deliberate final blackout from
+  a missing visual
 - no unexpected vocal-like MusicGen output by human listening review
 - manifest, report, and asset paths are complete
 
