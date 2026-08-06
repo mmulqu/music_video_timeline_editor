@@ -14,13 +14,17 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Music Video Timeline Desk</title>
-    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="app.css?v=20260803.10" />
   </head>
   <body>
     <header class="topbar">
-      <div>
+      <div class="project-heading">
         <p class="eyebrow">LOCAL MUSIC VIDEO EDITOR</p>
         <h1>MUSIC VIDEO TIMELINE <span>Timeline Desk</span></h1>
+        <div class="timeline-file-readout">
+          <span>TIMELINE FILE</span>
+          <output id="timeline-file-name" aria-live="polite">seed-manifest.json</output>
+        </div>
       </div>
       <div class="topbar-actions">
         <div class="lock-badge" title="The song is never trimmed, processed, or re-encoded by this editor.">
@@ -35,14 +39,14 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
     </header>
 
     <main class="editor-shell">
-      <aside class="inspector" aria-label="Selected caption editor">
+      <aside class="inspector" aria-label="Selected timeline row editor">
         <div class="panel-heading">
-          <p class="eyebrow">SELECTED CAPTION</p>
+          <p id="selected-kind" class="eyebrow">SELECTED CAPTION</p>
           <strong id="selected-id">—</strong>
         </div>
         <p id="selected-section" class="section-label">Choose a line from the cue sheet.</p>
 
-        <label class="field-label" for="caption-text">Caption text <span>canonical copy</span></label>
+        <label class="field-label" for="caption-text">Caption text <span id="caption-text-meta">canonical copy</span></label>
         <textarea id="caption-text" rows="5" spellcheck="true" placeholder="Caption text"></textarea>
 
         <div class="time-grid">
@@ -53,17 +57,22 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
             <input id="caption-end" inputmode="decimal" type="number" min="0" step="0.01" />
           </label>
         </div>
+        <label class="ripple-toggle" for="ripple-boundaries">
+          <input id="ripple-boundaries" type="checkbox" checked />
+          <span><strong>Ripple boundaries</strong><small>Keep neighboring images continuous; couple nearby lyric edges.</small></span>
+        </label>
         <p id="selected-duration" class="duration-readout">—</p>
 
         <div class="boundary-actions">
           <button id="set-in" class="secondary" title="Make this caption appear at the current song position">[ Set In</button>
           <button id="set-out" class="secondary" title="Make this caption disappear at the current song position">Set Out ]</button>
         </div>
-        <p class="timing-help">In = caption appears. Out = caption disappears. The song is never changed.</p>
+        <p id="timing-help" class="timing-help">In = caption appears. Out = caption disappears. The song is never changed.</p>
         <div class="jump-actions">
           <button id="jump-in" class="quiet">Jump to In</button>
           <button id="jump-out" class="quiet">Jump to Out</button>
         </div>
+        <button id="delete-selected-row" class="remove-visual selected-row-delete" type="button" hidden>Delete selected row</button>
 
         <label class="field-label" for="caption-notes">Notes <span>saved in output JSON</span></label>
         <textarea id="caption-notes" rows="3" placeholder="Timing or visual note…"></textarea>
@@ -88,7 +97,28 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
               <button id="play-toggle" class="play-button" aria-label="Play">▶</button>
               <button id="forward" class="icon-button" title="Forward 5 seconds" aria-label="Forward 5 seconds">↷</button>
             </div>
-            <div class="clock"><output id="current-clock">00:00.000</output><span>/</span><output id="total-clock">00:00.000</output></div>
+            <div class="playback-rate-control" aria-label="Soundtrack preview speed">
+              <span>PREVIEW SPEED</span>
+              <div class="rate-controls">
+                <button class="rate-preset active" type="button" data-rate="1" aria-pressed="true">1×</button>
+                <button class="rate-preset" type="button" data-rate="0.8" aria-pressed="false">.8×</button>
+                <button class="rate-preset" type="button" data-rate="0.5" aria-pressed="false">.5×</button>
+                <button class="rate-preset" type="button" data-rate="0.3" aria-pressed="false">.3×</button>
+                <label class="custom-rate" title="Enter any preview rate from 0.1 to 2.0">
+                  <input id="playback-rate" type="number" min="0.1" max="2" step="0.05" value="1" inputmode="decimal" aria-label="Custom preview speed" />
+                  <span>×</span>
+                </label>
+              </div>
+              <small>Preview only · timing unchanged</small>
+            </div>
+            <div class="clock-panel">
+              <div class="clock"><output id="current-clock">00:00.000</output><span>/</span><output id="total-clock">00:00.000</output></div>
+              <div class="clock-format" role="group" aria-label="Waveform clock format">
+                <span>WAVEFORM CLOCK</span>
+                <button class="clock-format-option active" type="button" data-clock-format="timecode" aria-pressed="true" title="Show minutes, seconds, and milliseconds">MM:SS.mmm</button>
+                <button class="clock-format-option" type="button" data-clock-format="seconds" aria-pressed="false" title="Show total seconds for direct In/Out entry">SECONDS</button>
+              </div>
+            </div>
             <div class="transport-meta"><span id="caption-at-playhead">No caption at playhead</span></div>
           </div>
           <div class="transport-stage">
@@ -109,7 +139,7 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
                 <div id="cue-window" class="cue-window" aria-hidden="true"></div>
               </div>
               <div class="follow-control">
-                <label><input id="follow-playhead" type="checkbox" checked /> Follow active caption</label>
+                <label><input id="follow-playhead" type="checkbox" checked /> Follow active timeline row</label>
                 <span id="music-file-label">No song loaded</span>
               </div>
             </div>
@@ -125,12 +155,13 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
         <section class="cue-sheet-panel">
           <div class="sheet-heading">
             <div>
-              <p class="eyebrow">CAPTION CUE SHEET</p>
-              <h2>Lyrics are truth. Timing is editable.</h2>
+              <p class="eyebrow">LYRICS + VISUAL-ONLY BEATS</p>
+              <h2>Every image interval is visible.</h2>
             </div>
             <div class="sheet-tools">
-              <label class="search"><span>⌕</span><input id="caption-filter" type="search" placeholder="Find text, ID, or section" /></label>
-              <button id="add-caption" class="secondary">+ Caption</button>
+              <label class="search"><span>⌕</span><input id="caption-filter" type="search" placeholder="Find lyric, visual, ID, or section" /></label>
+              <button id="add-visual-beat" class="secondary insert-visual-action" type="button" title="Split the image under the playhead and choose a new image for the second part">+ VIS at playhead</button>
+              <button id="add-caption" class="secondary" title="Add an actual lyric caption">+ Lyric caption</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -158,7 +189,7 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
         </div>
         <section id="cue-media-panel" class="media-tab-panel" role="tabpanel">
           <div class="cue-media-summary"><strong id="cue-media-title">C001</strong><span id="cue-media-count">0 visuals</span></div>
-          <p class="asset-help">Replace an existing shot, seek to it, or open Library to add another visual beat to this lyric.</p>
+          <p id="cue-media-help" class="asset-help">Replace an existing shot, seek to it, or open Library to add another visual beat to this lyric.</p>
           <button id="add-from-library" class="primary media-wide-action">+ Add visual from Library</button>
           <div id="cue-media-list" class="cue-media-list"></div>
         </section>
@@ -183,11 +214,29 @@ FORM: A cue-sheet editor with a timeline rail, not a dashboard card grid.
 
     <template id="asset-template">
       <article class="asset-card">
-        <div class="asset-thumb"></div>
+        <button class="asset-thumb" type="button"></button>
         <div class="asset-info"><strong></strong><span></span></div>
         <button class="use-asset">Use at selected cue</button>
       </article>
     </template>
-    <script src="app.js"></script>
+
+    <dialog id="media-lightbox" class="media-lightbox" aria-labelledby="media-lightbox-title" aria-describedby="media-lightbox-meta">
+      <section class="media-lightbox-frame">
+        <header class="media-lightbox-header">
+          <div>
+            <p class="eyebrow">LIBRARY PREVIEW</p>
+            <h2 id="media-lightbox-title">Visual preview</h2>
+          </div>
+          <button id="media-lightbox-close" class="media-lightbox-close" type="button" aria-label="Close large preview">×</button>
+        </header>
+        <div id="media-lightbox-stage" class="media-lightbox-stage"></div>
+        <footer class="media-lightbox-footer">
+          <span id="media-lightbox-meta"></span>
+          <span>Esc to close</span>
+        </footer>
+      </section>
+    </dialog>
+
+    <script src="app.js?v=20260803.10"></script>
   </body>
 </html>

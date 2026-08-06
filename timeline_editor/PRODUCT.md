@@ -31,10 +31,35 @@ and saves a project-relative JSON manifest for FFmpeg assembly.
 ## Capabilities and Constraints
 
 - Edit caption text, start, and end times.
+- Show uncaptioned visual intervals as first-class, blank-lyric rows in the
+  chronological cue sheet, where they can be sought, retimed, replaced, or
+  removed without inventing a caption association. An explicitly selected VIS
+  row remains selected for editing regardless of interval length or an
+  overlapping lyric, until playback starts or the user seeks elsewhere.
 - Add, retime, and associate still-image, animated-GIF, or video visual cues.
-- Replace the visual under the playhead without changing its timeline In/Out;
-  adding another beat is a separate explicit mode.
+- Insert a caption-free visual beat at the exact playhead by splitting the
+  image currently covering that point. Preserve the original outer coverage,
+  every lyric boundary, and soundtrack timing.
+- Replace the visual under the playhead without changing its timeline In/Out.
+  Adding another visual is a separate explicit mode that evenly divides the
+  cue's existing visual coverage without changing its outer or caption timing.
+- Remove a visual through an explicit Remove & merge action. Give its interval
+  to the previous visual, or to the next visual when removing the first beat,
+  without moving caption or soundtrack timing. Expose the action in the
+  selected-VIS inspector as well as the Current cue media manager.
+- Delete any selected lyric caption without deleting or retiming its images.
+  Convert linked images into standalone VIS rows at their existing intervals,
+  and leave every other caption and the soundtrack unchanged.
 - Load a local music file, fingerprint it, and preview the synchronized edit.
+- Slow preview playback to a preset or custom rate for manual timing while
+  preserving the soundtrack file and timeline timecodes unchanged.
+- Switch the waveform transport clock between `MM:SS.mmm` and total decimal
+  seconds so playhead values can be read directly in the same units used by
+  editable In/Out fields. This is a display preference only.
+- Ripple edited In/Out boundaries across adjacent visual beats by default so
+  retiming cannot silently create black frames. Couple nearby lyric boundaries
+  while preserving longer intentional lyric pauses and visual-only passages;
+  allow ripple to be disabled for deliberate gaps or overlaps.
 - Follow and scroll to the active caption during playback.
 - Import project folders or individual local media files as session assets.
 - Discover newly added files from the project `images` folder on demand and

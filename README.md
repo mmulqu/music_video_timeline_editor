@@ -12,8 +12,34 @@ the song.
 
 Opening **Library** defaults to replacing the visual under the playhead. The
 editor names the targeted visual and preserves its exact timeline In/Out. Adding
-another visual beat requires the separate **+ Add new beat** mode and reports
-overlaps.
+another image requires the separate **+ Split cue** mode. It keeps the current
+visual group's outer In/Out and divides that coverage evenly across the images,
+without moving lyric or soundtrack timing.
+
+Use **Remove & merge** to delete a visual without leaving a black gap. The
+previous image absorbs its interval; deleting the first image extends the next
+one backward. The editor confirms before applying the change.
+
+To place a new image cut anywhere, park the playhead inside the current image,
+click **+ VIS at playhead**, and choose an asset from Library. The current image
+ends at that exact point and the new caption-free VIS occupies the remainder of
+its interval; lyric and soundtrack timing do not move. Select any VIS row to
+find the matching **Delete VIS & merge** action in the left inspector.
+
+The same inspector action can delete any selected caption. Its linked images
+are retained at the exact same times and become standalone `VIS` rows; deleting
+a caption never silently deletes its imagery or changes the soundtrack.
+
+The cue sheet interleaves lyrics with uncaptioned `VIS` rows, so every image
+interval can be found and edited. Selecting a `VIS` row keeps that exact visual
+targeted even for extremely short intervals or overlapping lyrics. Playback or
+an independent seek resumes normal Follow-playhead selection. Preview
+playback can be slowed without changing saved timecodes or the soundtrack. **Ripple boundaries** is enabled by
+default: image cuts stay continuous, nearby lyric edges move together, and
+longer intentional lyric pauses remain intact.
+
+The waveform clock can show either `MM:SS.mmm` or total decimal seconds. Seconds
+mode matches the units used by editable In/Out fields and changes display only.
 
 ## Run locally
 
@@ -37,9 +63,13 @@ Then open <http://127.0.0.1:8878/timeline_editor/>.
 1. Use **Load music** and choose the finished song. Keep that file in the
    repository root when assembling later.
 2. Edit caption copy and In/Out at the playhead, or open an existing timeline.
+   Use the speed presets or custom field for close timing work. Disable
+   **Ripple boundaries** only when you intentionally want a gap or overlap.
 3. Put reusable visual files in `images/`. Library scans that directory when it
    opens, every 15 seconds while visible, and whenever **Refresh** is pressed.
-4. Seek to a visual and choose a Library asset to replace it without retiming.
+4. Use **+ VIS at playhead** for a new image cut, or seek to a caption or
+   blank-lyric `VIS` row and choose a Library asset to
+   replace it without retiming.
 5. Save the timeline JSON.
 
 The browser can also import individual files or a complete project folder.

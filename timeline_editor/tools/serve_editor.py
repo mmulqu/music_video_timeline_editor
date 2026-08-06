@@ -82,6 +82,11 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def end_headers(self) -> None:
+        request_path = urlsplit(self.path).path.lower()
+        if request_path != "/api/media" and (
+            request_path.endswith("/") or Path(request_path).suffix in {".html", ".css", ".js", ".json"}
+        ):
+            self.send_header("Cache-Control", "no-store")
         self.send_header("Accept-Ranges", "bytes")
         super().end_headers()
 
